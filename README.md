@@ -1,3 +1,1 @@
-# beset
-
-[Beset](https://www.wikiwand.com/en/Bes)
+# kIP (pronounced as 'kɪp')
