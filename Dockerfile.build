@@ -1,0 +1,15 @@
+FROM golang:alpine
+MAINTAINER "Aviv Laufer <aviv.laufer@gmail.com>"
+
+RUN apk update && \
+    apk add git build-base && \
+    rm -rf /var/cache/apk/* && \
+    mkdir -p "$GOPATH/src/github.com/doitintl/kip"
+
+ADD . "$GOPATH/src/github.com/doitintl/kip"
+
+RUN cd "$GOPATH/src/github.com/doitintl/kip" && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s" -o /kip
+
+COPY Dockerfile.run /
+CMD tar -cf - -C / Dockerfile.run kip
