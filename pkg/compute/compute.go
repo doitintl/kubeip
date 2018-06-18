@@ -36,16 +36,6 @@ import (
 	"google.golang.org/api/container/v1"
 )
 
-var scopes string
-
-/*func init() {
-	scopes = strings.Join([]string{
-		compute.DevstorageFullControlScope,
-		compute.ComputeScope,
-	}, " ")
-
-}*/
-
 func ListClusterZones(projectID string, clusterName string) ([]string, error) {
 	retval := make([]string, 0)
 	ctx := context.Background()
@@ -123,7 +113,7 @@ func ProjectName() (string, error) {
 	return string(project), nil
 }
 
-func FindAddress(projectID string, region string,config *cfg.Config) (string, error) {
+func FindAddress(projectID string, region string, config *cfg.Config) (string, error) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
@@ -150,7 +140,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 	if err != nil {
 		logrus.Fatalf("Could not get authenticated client: %v", err)
 	}
-	region :=zone[:len(zone)-2]
+	region := zone[:len(zone)-2]
 	addr, err := FindAddress(projectID, region, config)
 	if err != nil {
 		logrus.Infof(err.Error())
@@ -195,9 +185,7 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 			logrus.Errorf("ZoneOperations.Get %q %s", err, operation.Name)
 			return err
 		}
-		logrus.Infof("Status %s", op.Status)
 		if strings.ToLower(op.Status) != "done" {
-			logrus.Info("sleeping")
 			time.Sleep(2 * time.Second)
 		} else {
 			return nil
@@ -209,9 +197,5 @@ func Kip(instance <-chan types.Instance, config *cfg.Config) {
 		inst := <-instance
 		logrus.Infof("Working on %s", inst.Name)
 		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
-		//TODO Wait for completion of ip status
-
-
 	}
-
 }

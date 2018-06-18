@@ -18,8 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-
-
 package main
 
 import (
@@ -27,18 +25,18 @@ import (
 	c "github.com/doitintl/kip/pkg/client"
 	"github.com/doitintl/kip/pkg/compute"
 	cfg "github.com/doitintl/kip/pkg/config"
-
 )
+
 var config *cfg.Config
 
 func main() {
 	config, _ = cfg.NewConfig()
-	cluster ,err:=compute.ClusterName()
-	if err !=nil {
+	cluster, err := compute.ClusterName()
+	if err != nil {
 		logrus.Info(err)
 	}
 	projectID, err := compute.ProjectName()
-	if err !=nil {
+	if err != nil {
 		logrus.Info(err)
 	}
 	logrus.WithFields(logrus.Fields{

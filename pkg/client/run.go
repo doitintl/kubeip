@@ -21,8 +21,8 @@
 package client
 
 import (
-	"github.com/doitintl/kip/pkg/controller"
 	cfg "github.com/doitintl/kip/pkg/config"
+	"github.com/doitintl/kip/pkg/controller"
 )
 
 func Run(config *cfg.Config) {

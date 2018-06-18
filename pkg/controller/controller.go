@@ -70,7 +70,7 @@ var serverStartTime time.Time
 
 const maxRetries = 5
 
-const prfeix = "kube-system/kube-proxy-"
+const prefix = "kube-system/kube-proxy-"
 
 func Start(config *cfg.Config) {
 	var kubeClient kubernetes.Interface
@@ -217,13 +217,13 @@ func (c *Controller) processItem(newEvent Event) error {
 		// Could be Replaced by using Delta or DeltaFIFO
 
 		if objectMeta.CreationTimestamp.Sub(serverStartTime).Seconds() > 0 {
-			if strings.HasPrefix(newEvent.key, prfeix) {
-				node := newEvent.key[len(prfeix):]
+			if strings.HasPrefix(newEvent.key, prefix) {
+				node := newEvent.key[len(prefix):]
 				logrus.WithField("pkg", "kip-"+newEvent.resourceType).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				var inst types.Instance
 				inst.Name = node
 				inst.ProjectID = c.projectID
-					zones, err := compute.ListClusterZones(c.projectID, c.clusterName)
+				zones, err := compute.ListClusterZones(c.projectID, c.clusterName)
 				if err == nil {
 					for _, zone := range zones {
 						inst.Zone = zone

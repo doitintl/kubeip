@@ -23,7 +23,7 @@ package config
 import "github.com/spf13/viper"
 
 type Config struct {
-	LabelKey string
+	LabelKey   string
 	LabelValue string
 }
 
@@ -37,8 +37,8 @@ func NewConfig() (*Config, error) {
 	viper.AutomaticEnv()
 	setConfigDefaults()
 	c := Config{
-		LabelKey:                      viper.GetString("labelkey"),
-		LabelValue:                      viper.GetString("labelvalue"),
+		LabelKey:   viper.GetString("labelkey"),
+		LabelValue: viper.GetString("labelvalue"),
 	}
 	return &c, nil
 }
