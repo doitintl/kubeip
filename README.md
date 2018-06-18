@@ -22,6 +22,7 @@ Replace **us-central1** with the region where your GKE cluster resides and **kip
 ```
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kip-cluster
+export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compute.storageAdmin" )
 ```
 
 **Build the images**
@@ -53,17 +54,7 @@ gcloud iam service-accounts create kip-service-account \
 Attach required roles to the service account by running the following commands:
 
 ```
-gcloud projects add-iam-policy-binding $PROJECT_ID \
---member serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
---role roles/compute.admin
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
---member serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
---role roles/container.clusterAdmin
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
---member serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
---role roles/compute.storageAdmin
+for role in "${roles[@]}"; do gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role $role;done
 ```
 
 Generate the Key using the following command:
