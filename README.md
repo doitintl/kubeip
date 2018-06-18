@@ -27,7 +27,7 @@ export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compu
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
-**Build the images**
+**Build kIP's container image**
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
 
@@ -47,13 +47,13 @@ Build the Docker image with compiled version of kIP as following:
 make binary-image
 ```
 
-Tag the image using 
+Tag the image using: 
 
 ```
 docker tag  kip gcr.io/$PROJECT_ID/kip
 ```
 
-Finally, push the image to Google Container Registry with 
+Finally, push the image to Google Container Registry with: 
 
 ```
 docker push gcr.io/$PROJECT_ID/kip
@@ -61,11 +61,10 @@ docker push gcr.io/$PROJECT_ID/kip
 
 **Create IAM Service Account and obtain the Key in JSON format**
 
-Create Service Account with this command 
+Create Service Account with this command: 
 
 ```
-gcloud iam service-accounts create kip-service-account \
---display-name "kIP"
+gcloud iam service-accounts create kip-service-account --display-name "kIP"
 ```
 
 Attach required roles to the service account by running the following commands:
@@ -94,8 +93,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kip-key \
---from-file=key.json
+kubectl create secret generic kip-key --from-file=key.json
 ```
 
 **Create static reserved IP addresses:** 
