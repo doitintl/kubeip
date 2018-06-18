@@ -48,3 +48,6 @@ By default **kip** looks for label "kip" with a value "reserved". You can overri
 A common practice is to assign a unique value per cluster (for example cluster name)
 
 Deploy by running `kubctl apply -f deploy/.`
+
+
+[Event listing code was take from kubewatch](https://github.com/bitnami-labs/kubewatch/)
