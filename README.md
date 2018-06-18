@@ -11,7 +11,7 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
  - Run `dep ensure`
 
 Build and push the image 
- - Run `gcloud config set project my_project` and replace the my_project with real project_id of your Google Cloud project
+ - Run `gcloud config set project my_project` and replace the my_project with real project_id of your project
  - Run `export PROJECT_ID=$(gcloud config list --format 'value(core.project)')`
  - `make builder-image`
  - `make binary-image`
