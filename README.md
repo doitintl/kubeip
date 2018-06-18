@@ -8,15 +8,15 @@ You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubec
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep)
 
-Run `dep ensure`
+ - Run `dep ensure`
 
 Build and push the image 
+ - Run `gcloud config set project my_project` and replace the my_project with real project_id of your Google Cloud project
+ - Run `export PROJECT_ID=$(gcloud config list --format 'value(core.project)')`
  - `make builder-image`
  - `make binary-image`
- - `docker tag  kip gcr.io/_my-project_/kip`
- - `gcloud docker -- push gcr.io/_my-project_/kip`
-
-*Please replace `_my-project_` with your Google Cloud project id and version in `deploy/kip-deployment.yaml`*
+ - `docker tag  kip gcr.io/$PROJECT_ID/kip`
+ - `gcloud docker -- push gcr.io/$PROJECT_ID/kip`
 
 **Create a service account with permission the following roles**
 
