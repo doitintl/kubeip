@@ -12,17 +12,17 @@ You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.
 Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
 
 ```
-git clone https://github.com/doitintl/kubeIP.git $GOPATH/src/kip
-cd $GOPATH/src/kip 
+git clone https://github.com/doitintl/kubeIP.git $GOPATH/src/kubeip
+cd $GOPATH/src/kubeip 
 ```
 
 **Set Environment Variables**
 
-Replace **us-central1** with the region where your GKE cluster resides and **kip-cluster** with your real GKE cluster name
+Replace **us-central1** with the region where your GKE cluster resides and **kubeip-cluster** with your real GKE cluster name
 
 ```
 export GCP_REGION=us-central1
-export GKE_CLUSTER_NAME=kip-cluster
+export GKE_CLUSTER_NAME=kubeip-cluster
 export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compute.storageAdmin" )
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
@@ -50,13 +50,13 @@ make binary-image
 Tag the image using: 
 
 ```
-docker tag  kip gcr.io/$PROJECT_ID/kip
+docker tag  kubeip gcr.io/$PROJECT_ID/kubeip
 ```
 
 Finally, push the image to Google Container Registry with: 
 
 ```
-docker push gcr.io/$PROJECT_ID/kip
+docker push gcr.io/$PROJECT_ID/kubeip
 ```
 
 **Create IAM Service Account and obtain the Key in JSON format**
