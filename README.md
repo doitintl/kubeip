@@ -83,4 +83,4 @@ Deploy by running `kubctl apply -f deploy/.`
 
 References:
 
- - [Event listing code was take from kubewatch](https://github.com/bitnami-labs/kubewatch/)
+ - Event listing code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)
