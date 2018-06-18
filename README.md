@@ -86,6 +86,12 @@ Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke
 sed -i 's/reserved/<b>gke-cluster-name</b>/g' deploy/kip-configmap.yaml
 </pre>
 
+Adjust the deploy/kip-deployment.yaml to reflect your real container image path:
+
+<pre>
+sed -i "s/my-project/$PROJECT_ID/g" deploy/kip-deployment.yaml
+</pre>
+
 Deploy kIP by running 
 
 ```
