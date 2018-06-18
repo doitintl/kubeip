@@ -1,5 +1,7 @@
 # kIP (pronounced as 'kɪp')
 
+Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kIP tries to solve this problem with assigning GKE nodes external IP addresses from a predefined list by constantly watching the Kubernetes API for new/removed nodes and applying changes accordingly. 
+
 **Prerequisites**
 
 You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which will also install kubectl) [here](https://cloud.google.com/sdk).
