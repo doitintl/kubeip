@@ -22,7 +22,7 @@ spec:
           - name: google-cloud-key
             mountPath: /var/secrets/google
           env:
-          - name: "KIP_LABEl_KEY"
+          - name: "KUBEIP_LABEl_KEY"
             valueFrom:
               configMapKeyRef:
                 key: "KUBEIP_LABEl_KEY"
