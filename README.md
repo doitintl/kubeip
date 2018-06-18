@@ -11,7 +11,7 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
  - Run `dep ensure`
 
 Build and push the image 
- - Set project with `gcloud config set project my_project` and replace the my_project with real project_id of your project
+ - Set project with `gcloud config set project my_project` and replace the my_project with your [project_id](https://cloud.google.com/storage/docs/projects)
  - Run `export PROJECT_ID=$(gcloud config list --format 'value(core.project)')`
  - Compile the kIP with `make builder-image`
  - build the Docker image with compiled version of kIP `make binary-image`
