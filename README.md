@@ -51,11 +51,11 @@ gcloud iam service-accounts keys create key.json \
  
 **Create Kubernetes Secret**
 
-Get your GKE cluster credentaials with (replace *cluster_name* and *your_zone* with real values):
+Get your GKE cluster credentaials with (replace *cluster_name* and *us-central1* with your real region):
 
 <pre>
 gcloud container clusters get-credentials <b>cluster_name</b> \
---zone your_zone \
+--region <b>us-central1</b> \
 --project $PROJECT_ID
 </pre> 
 
