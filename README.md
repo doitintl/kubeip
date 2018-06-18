@@ -1,7 +1,7 @@
 
 # kIP (pronounced as 'kɪp')
 * Build the images
-	* Install go/dep (Go dependency management tool) using instructions at `https://github.com/golang/dep`
+	* Install go/dep (Go dependency management tool) using instructions at (https://github.com/golang/dep)
 	* Run `dep ensure`
 	* Build and push your image `make builder-image; make binary-image;  docker tag  kip gcr.io/my-project/kip; gcloud docker -- push gcr.io/my-project/kip`
 * Replace `image: "gcr.io/my-project/kip"` to your project name and version in `deploy/kip-deployment.yaml`
