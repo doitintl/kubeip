@@ -101,7 +101,7 @@ for i in {1..10}; do gcloud compute addresses create kip-ip$i --project=$PROJECT
 Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
 
 ```
-for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region $GCP_REGION; done
+for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
 ```
 
 Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
