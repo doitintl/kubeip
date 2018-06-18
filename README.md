@@ -45,7 +45,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 Generate the Key using the following command:
 
 ```
-gcloud iam service-accounts keys create key.json \
+gcloud iam service-accounts keys create kip-key \
 --iam-account kip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
  
@@ -63,7 +63,7 @@ Create a Kubernetes secret by running:
 
 ```
 kubectl create secret generic kip-key \
---from-file=key.json=filename`
+--from-file=key.json=filename
 ```
 
 **Create static reserved IP addresses:** 
