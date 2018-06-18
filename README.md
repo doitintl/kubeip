@@ -53,11 +53,11 @@ gcloud iam service-accounts keys create key.json \
 
 Get your GKE cluster credentaials with (replace *cluster_name* and *your_zone* with real values):
 
-```
-gcloud container clusters get-credentials cluster_name \
+<pre>
+gcloud container clusters get-credentials <b>cluster_name</b> \
 --zone your_zone \
 --project $PROJECT_ID
-``` 
+</pre> 
 
 Create a Kubernetes secret by running:
 
@@ -80,7 +80,11 @@ Add labels to reserved IP addresses. A common practice is to assign a unique val
 for i in {1..4}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region us-central1; done
 ```
 
-By default **kip** looks for label "kip" with a value "reserved". You can override this by setting `KIP_LABEl_KEY` and `KIP_LABEl_VALUE` in deploy/kip-configmap.yaml 
+Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
+
+<pre>
+sed -i 's/reserved/<b>gke-cluster-name</b>/g' file.txt
+</pre>
 
 Deploy kIP by running 
 
