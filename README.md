@@ -15,6 +15,14 @@ git clone https://github.com/doitintl/kIP.git $GOPATH/src/kip
 cd $GOPATH/src/kip 
 ```
 
+**Set Environment Variables**
+
+Replace **us-central1** with the region where your GKE cluster resides:
+
+```
+export GCP_REGION=us-central1
+```
+
 **Build the images**
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
@@ -66,11 +74,11 @@ gcloud iam service-accounts keys create key.json \
  
 **Create Kubernetes Secret**
 
-Get your GKE cluster credentaials with (replace *cluster_name* and *us-central1* with your real region):
+Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
 
 <pre>
 gcloud container clusters get-credentials <b>cluster_name</b> \
---region <b>us-central1</b> \
+--region $GCP_REGION \
 --project $PROJECT_ID
 </pre> 
 
@@ -86,13 +94,13 @@ kubectl create secret generic kip-key \
 Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
 
 ```
-for i in {1..10}; do gcloud compute addresses create kip-ip$i --project=$PROJECT_ID --region=us-central1; done
+for i in {1..10}; do gcloud compute addresses create kip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
 ```
 
 Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
 
 ```
-for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region us-central1; done
+for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region $GCP_REGION; done
 ```
 
 Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
