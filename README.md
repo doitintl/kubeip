@@ -1,10 +1,11 @@
 # kIP (pronounced as 'kɪp')
 
-Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kIP tries to solve this problem with assigning GKE nodes external IP addresses from a predefined list by constantly watching the Kubernetes API for new/removed nodes and applying changes accordingly. 
+Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
 **Prerequisites**
 
-You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which will also install kubectl) [here](https://cloud.google.com/sdk).
+You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+
 
 **Clone Git Repository**
 
@@ -23,6 +24,7 @@ Replace **us-central1** with the region where your GKE cluster resides and **kip
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kip-cluster
 export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compute.storageAdmin" )
+export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
 **Build the images**
@@ -33,14 +35,29 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
 dep ensure
 ```
 
-Build and push the image:
+Compile the kIP by running: 
 
- - Set project with `gcloud config set project my_project` and replace the my_project with your [project_id](https://cloud.google.com/storage/docs/projects)
- - Run `export PROJECT_ID=$(gcloud config list --format 'value(core.project)')`
- - Compile the kIP with `make builder-image`
- - build the Docker image with compiled version of kIP `make binary-image`
- - Tag the image using `docker tag  kip gcr.io/$PROJECT_ID/kip`
- - Push the image to Google Container Registry with `docker push gcr.io/$PROJECT_ID/kip`
+```
+make builder-image
+```
+
+Build the Docker image with compiled version of kIP as following:
+
+```
+make binary-image
+```
+
+Tag the image using 
+
+```
+docker tag  kip gcr.io/$PROJECT_ID/kip
+```
+
+Finally, push the image to Google Container Registry with 
+
+```
+docker push gcr.io/$PROJECT_ID/kip
+```
 
 **Create IAM Service Account and obtain the Key in JSON format**
 
