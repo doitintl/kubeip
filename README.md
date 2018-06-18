@@ -12,8 +12,8 @@
 	* Compute Admin
 * Download the key file in JSON format
 * Create secret - `kubectl create secret generic kip-key --from-file=key.json=filename`
-* Create reserved ip address. By default kip looks form lable "kip" with a value "reserved". You can overide this by setting 
-KIP_LABEl_KEY and KIP_LABEl_VALUE in kip-configmap.yaml. A coomon pratice is to assign a unique value per cluster (for example cluster name) 
+* Create reserved ip address. By default kip looks form label "kip" with a value "reserved". You can override this by setting
+KIP_LABEl_KEY and KIP_LABEl_VALUE in kip-configmap.yaml. A common practice is to assign a unique value per cluster (for example cluster name)
 * Deploy - `kubctl apply -f deploy/.`
 
 
