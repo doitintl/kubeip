@@ -68,16 +68,16 @@ kubectl create secret generic kip-key \
 
 **Create static reserved IP addresses:** 
 
-Create as many static IP addresses as number of nodes in your GKE cluster (this example creates 4 addresses):
+Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
 
 ```
-for i in {1..4}; do gcloud compute addresses create kip-ip$i --project=$PROJECT_ID --region=us-central1; done
+for i in {1..10}; do gcloud compute addresses create kip-ip$i --project=$PROJECT_ID --region=us-central1; done
 ```
 
 Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
 
 ```
-for i in {1..4}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region us-central1; done
+for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region us-central1; done
 ```
 
 Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
