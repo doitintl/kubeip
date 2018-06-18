@@ -80,7 +80,7 @@ Add labels to reserved IP addresses. A common practice is to assign a unique val
 for i in {1..4}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=reserved --region us-central1; done
 ```
 
-By default **kip** looks for label "kip" with a value "reserved". You can override this by setting `KIP_LABEl_KEY` and `KIP_LABEl_VALUE` in kip-configmap.yaml. 
+By default **kip** looks for label "kip" with a value "reserved". You can override this by setting `KIP_LABEl_KEY` and `KIP_LABEl_VALUE` in deploy/kip-configmap.yaml 
 
 Deploy kIP by running 
 
