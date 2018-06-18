@@ -30,6 +30,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/doitintl/kip/pkg/compute"
+	cfg "github.com/doitintl/kip/pkg/config"
 	"github.com/doitintl/kip/pkg/types"
 	"github.com/doitintl/kip/pkg/utils"
 	api_v1 "k8s.io/api/core/v1"
@@ -46,14 +47,15 @@ import (
 
 // Controller object
 type Controller struct {
-	logger    *logrus.Entry
-	clientset kubernetes.Interface
-	queue     workqueue.RateLimitingInterface
-	informer  cache.SharedIndexInformer
-	instance  chan<- types.Instance
-	projectID string
+	logger      *logrus.Entry
+	clientset   kubernetes.Interface
+	queue       workqueue.RateLimitingInterface
+	informer    cache.SharedIndexInformer
+	instance    chan<- types.Instance
+	projectID   string
 	clusterName string
-	}
+	config      *cfg.Config
+}
 
 // Event indicate the informerEvent
 type Event struct {
@@ -70,7 +72,7 @@ const maxRetries = 5
 
 const prfeix = "kube-system/kube-proxy-"
 
-func Start() {
+func Start(config *cfg.Config) {
 	var kubeClient kubernetes.Interface
 	_, err := rest.InClusterConfig()
 	if err != nil {
@@ -101,6 +103,7 @@ func Start() {
 	if err != nil {
 		logrus.Fatal(err)
 	}
+	c.config = config
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -108,7 +111,7 @@ func Start() {
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
-	compute.Kip(instance)
+	compute.Kip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	signal.Notify(sigterm, syscall.SIGINT)
@@ -125,26 +128,6 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 			newEvent.key, err = cache.MetaNamespaceKeyFunc(obj)
 			newEvent.eventType = "create"
 			newEvent.resourceType = resourceType
-			logrus.WithField("pkg", "kip-"+resourceType).Debugf("Processing add to %v: %s", resourceType, newEvent.key)
-			if err == nil {
-				queue.Add(newEvent)
-			}
-		},
-		UpdateFunc: func(old, new interface{}) {
-			newEvent.key, err = cache.MetaNamespaceKeyFunc(old)
-			newEvent.eventType = "update"
-			newEvent.resourceType = resourceType
-			logrus.WithField("pkg", "kip-"+resourceType).Debugf("Processing update to %v: %s", resourceType, newEvent.key)
-			if err == nil {
-				queue.Add(newEvent)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			newEvent.key, err = cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			newEvent.eventType = "delete"
-			newEvent.resourceType = resourceType
-			newEvent.namespace = utils.GetObjectMetaData(obj).Namespace
-			logrus.WithField("pkg", "kip-"+resourceType).Debugf("Processing delete to %v: %s", resourceType, newEvent.key)
 			if err == nil {
 				queue.Add(newEvent)
 			}
@@ -240,12 +223,12 @@ func (c *Controller) processItem(newEvent Event) error {
 				var inst types.Instance
 				inst.Name = node
 				inst.ProjectID = c.projectID
-				zones,err :=compute.ListClusterZones("aviv-playground", "skid-master")
+					zones, err := compute.ListClusterZones(c.projectID, c.clusterName)
 				if err == nil {
 					for _, zone := range zones {
 						inst.Zone = zone
 						c.instance <- inst
-						logrus.Info(zone)
+						logrus.Infof("Processing %s cluster name %s in zone %s", node, c.clusterName, zone)
 					}
 
 				} else

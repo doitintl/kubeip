@@ -25,8 +25,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
+	cfg "github.com/doitintl/kip/pkg/config"
 	"github.com/doitintl/kip/pkg/types"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -121,7 +123,7 @@ func ProjectName() (string, error) {
 	return string(project), nil
 }
 
-func FindAddress() (string, error) {
+func FindAddress(projectID string, region string,config *cfg.Config) (string, error) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
@@ -133,7 +135,8 @@ func FindAddress() (string, error) {
 		logrus.Error(err)
 		return "", err
 	}
-	addresses, _ := computeService.Addresses.List("aviv-playground", "us-central1").Filter("(status=RESERVED) AND (labels.kin=pong)").Do()
+	filter := "(labels." + config.LabelKey + "=" + config.LabelValue + ")"
+	addresses, _ := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
 	if len(addresses.Items) != 0 {
 		return addresses.Items[0].Address, nil
 	}
@@ -141,35 +144,74 @@ func FindAddress() (string, error) {
 
 }
 
-func replaceIP(projectID string, zone string, instance string) error {
+func replaceIP(projectID string, zone string, instance string, config *cfg.Config) error {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
 		logrus.Fatalf("Could not get authenticated client: %v", err)
 	}
-
-	computeService, err := compute.New(hc)
-	computeService.Instances.DeleteAccessConfig(projectID, zone, instance, "external-nat", "nic0")
-	addr, err := FindAddress()
-	logrus.Info(addr)
+	region :=zone[:len(zone)-2]
+	addr, err := FindAddress(projectID, region, config)
 	if err != nil {
-		logrus.Error(err)
+		logrus.Infof(err.Error())
 		return err
 	}
+	logrus.Infof("Found reserved address %s", addr)
+	computeService, err := compute.New(hc)
+	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, "external-nat", "nic0").Do()
+	if err != nil {
+		logrus.Errorf("DeleteAccessConfig %q", err)
+		return err
+
+	}
+	waitForComplition(projectID, zone, op)
 	accessConfig := &compute.AccessConfig{
 		Name:  "External NAT",
 		Type:  "ONE_TO_ONE_NAT",
 		NatIP: addr,
+		Kind:  "compute#accessConfig",
 	}
-	computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig)
+	op, err = computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
+	if err != nil {
+		logrus.Errorf("AddAccessConfig %q", err)
+		return err
+	}
+	waitForComplition(projectID, zone, op)
+	logrus.Infof("Replaced IP for %s new ip %s", instance, addr)
 	return nil
 
 }
 
-func Kip(instance <-chan types.Instance) {
+func waitForComplition(projectID string, zone string, operation *compute.Operation) (err error) {
+	ctx := context.Background()
+	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
+	if err != nil {
+		logrus.Fatalf("Could not get authenticated client: %v", err)
+	}
+	computeService, err := compute.New(hc)
+	for {
+		op, err := computeService.ZoneOperations.Get(projectID, zone, operation.Name).Do()
+		if err != nil {
+			logrus.Errorf("ZoneOperations.Get %q %s", err, operation.Name)
+			return err
+		}
+		logrus.Infof("Status %s", op.Status)
+		if strings.ToLower(op.Status) != "done" {
+			logrus.Info("sleeping")
+			time.Sleep(2 * time.Second)
+		} else {
+			return nil
+		}
+	}
+}
+func Kip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
-		replaceIP(inst.ProjectID, inst.Zone, inst.Name)
+		logrus.Infof("Working on %s", inst.Name)
+		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
+		//TODO Wait for completion of ip status
+
+
 	}
 
 }
