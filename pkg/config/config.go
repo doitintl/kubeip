@@ -18,13 +18,27 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package client
+package config
 
-import (
-	"github.com/doitintl/kip/pkg/controller"
-	cfg "github.com/doitintl/kip/pkg/config"
-)
+import "github.com/spf13/viper"
 
-func Run(config *cfg.Config) {
-	controller.Start(config)
+type Config struct {
+	LabelKey string
+	LabelValue string
+}
+
+func setConfigDefaults() {
+	viper.SetDefault("LabelKey", "kip")
+	viper.SetDefault("LabelValue", "reserved")
+}
+
+func NewConfig() (*Config, error) {
+	viper.SetEnvPrefix("kip")
+	viper.AutomaticEnv()
+	setConfigDefaults()
+	c := Config{
+		LabelKey:                      viper.GetString("labelkey"),
+		LabelValue:                      viper.GetString("labelvalue"),
+	}
+	return &c, nil
 }

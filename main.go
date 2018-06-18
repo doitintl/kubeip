@@ -26,10 +26,13 @@ import (
 	"github.com/Sirupsen/logrus"
 	c "github.com/doitintl/kip/pkg/client"
 	"github.com/doitintl/kip/pkg/compute"
+	cfg "github.com/doitintl/kip/pkg/config"
+
 )
+var config *cfg.Config
 
 func main() {
-
+	config, _ = cfg.NewConfig()
 	cluster ,err:=compute.ClusterName()
 	if err !=nil {
 		logrus.Info(err)
@@ -42,12 +45,5 @@ func main() {
 		"Cluster name": cluster,
 		"Project name": projectID,
 	}).Info(" starting")
-
-	zones,_ :=compute.ListClusterZones("aviv-playground", "skid-master")
-	for _, zone := range zones {
-		// element is the element from someSlice for where we are
-		logrus.Info(zone)
-	}
-	c.Run()
-
+	c.Run(config)
 }

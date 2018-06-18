@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kip
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kip
+  template:
+      metadata:
+        labels:
+          app: kip
+      spec:
+        priorityClassName: system-cluster-critical
+        containers:
+        - name: "kip"
+          image: gcr.io/my-project/kip
+          imagePullPolicy: Always
+          volumeMounts:
+          - name: google-cloud-key
+            mountPath: /var/secrets/google
+          env:
+          - name: "KIP_LABEl_KEY"
+            valueFrom:
+              configMapKeyRef:
+                key: "KIP_LABEl_KEY"
+                name: "kip-config"
+          - name: "KIP_LABEl_VALUE"
+            valueFrom:
+              configMapKeyRef:
+                key: "KIP_LABEl_VALUE"
+                name: "kip-config"
+          - name: GOOGLE_APPLICATION_CREDENTIALS
+            value: /var/secrets/google/key.json
+        restartPolicy: Always
+        volumes:
+          - name: google-cloud-key
+            secret:
+              secretName: kip-key
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: kip-rbac
+subjects:
+  - kind: ServiceAccount
+    # Reference to upper's `metadata.name`
+    name: default
+    # Reference to upper's `metadata.namespace`
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
