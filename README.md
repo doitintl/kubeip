@@ -1,6 +1,6 @@
-# kIP (pronounced as 'kɪp')
+# KubeIP
 
-Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
+Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
 **Prerequisites**
 
@@ -12,7 +12,7 @@ You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.
 Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
 
 ```
-git clone https://github.com/doitintl/kIP.git $GOPATH/src/kip
+git clone https://github.com/doitintl/kubeIP.git $GOPATH/src/kip
 cd $GOPATH/src/kip 
 ```
 
@@ -27,7 +27,7 @@ export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compu
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
-**Build kIP's container image**
+**Build kubeIP's container image**
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
 
@@ -35,13 +35,13 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
 dep ensure
 ```
 
-Compile the kIP by running: 
+Compile the kubeIP by running: 
 
 ```
 make builder-image
 ```
 
-Build the Docker image with compiled version of kIP as following:
+Build the Docker image with compiled version of kubeIP as following:
 
 ```
 make binary-image
@@ -64,20 +64,20 @@ docker push gcr.io/$PROJECT_ID/kip
 Create Service Account with this command: 
 
 ```
-gcloud iam service-accounts create kip-service-account --display-name "kIP"
+gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
 ```
 
 Attach required roles to the service account by running the following commands:
 
 ```
-for role in "${roles[@]}"; do gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role $role;done
+for role in "${roles[@]}"; do gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role $role;done
 ```
 
 Generate the Key using the following command:
 
 ```
 gcloud iam service-accounts keys create key.json \
---iam-account kip-service-account@$PROJECT_ID.iam.gserviceaccount.com
+--iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
  
 **Create Kubernetes Secret**
@@ -93,7 +93,7 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kip-key --from-file=key.json
+kubectl create secret generic kubeip-key --from-file=key.json
 ```
 
 **Create static reserved IP addresses:** 
@@ -101,28 +101,28 @@ kubectl create secret generic kip-key --from-file=key.json
 Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
 
 ```
-for i in {1..10}; do gcloud compute addresses create kip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
+for i in {1..10}; do gcloud compute addresses create kubeIP-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
 ```
 
 Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
 
 ```
-for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labels kip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
+for i in {1..10}; do gcloud beta compute addresses update kubeIP-ip$i --update-labels kubeIP=$GKE_CLUSTER_NAME --region $GCP_REGION; done
 ```
 
-Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
+Adjust the deploy/kubeip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
 
 <pre>
-sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kip-configmap.yaml
+sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 </pre>
 
-Adjust the deploy/kip-deployment.yaml to reflect your real container image path:
+Adjust the deploy/kubeip-deployment.yaml to reflect your real container image path:
 
 <pre>
-sed -i "s/my-project/$PROJECT_ID/g" deploy/kip-deployment.yaml
+sed -i "s/my-project/$PROJECT_ID/g" deploy/kubeip-deployment.yaml
 </pre>
 
-Deploy kIP by running 
+Deploy kubeIP by running 
 
 ```
 kubectl apply -f deploy/.
