@@ -6,9 +6,22 @@ Many applications need to be whitelisted by consumers based on source IP address
 
 You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which will also install kubectl) [here](https://cloud.google.com/sdk).
 
+**Clone Git Repository**
+
+Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
+
+```
+git clone https://github.com/doitintl/kIP.git $GOPATH/src/kip
+cd $GOPATH/src/kip 
+```
+
 **Build the images**
 
-Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) by running `dep ensure`
+Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
+
+```
+dep ensure
+```
 
 Build and push the image:
 
