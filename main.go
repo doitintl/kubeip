@@ -22,9 +22,9 @@ package main
 
 import (
 	"github.com/Sirupsen/logrus"
-	c "github.com/doitintl/kip/pkg/client"
-	"github.com/doitintl/kip/pkg/compute"
-	cfg "github.com/doitintl/kip/pkg/config"
+	c "github.com/doitintl/kubeip/pkg/client"
+	"github.com/doitintl/kubeip/pkg/compute"
+	cfg "github.com/doitintl/kubeip/pkg/config"
 )
 
 var config *cfg.Config
