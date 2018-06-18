@@ -83,7 +83,7 @@ for i in {1..4}; do gcloud beta compute addresses update kip-ip$i --update-label
 Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
 
 <pre>
-sed -i 's/reserved/<b>gke-cluster-name</b>/g' file.txt
+sed -i 's/reserved/<b>gke-cluster-name</b>/g' deploy/kip-configmap.yaml
 </pre>
 
 Deploy kIP by running 
