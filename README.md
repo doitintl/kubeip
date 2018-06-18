@@ -18,7 +18,12 @@ Build and push the image:
 
 **Create IAM Service Account and obtain the Key in JSON format**
 
-Create Service Account with this command `gcloud iam service-accounts create kip-service-account --display-name "kIP"`
+Create Service Account with this command 
+
+```
+gcloud iam service-accounts create kip-service-account \
+--display-name "kIP"`
+```
 
 Attach required roles to the service account by running the following commands:
 
