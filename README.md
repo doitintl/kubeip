@@ -6,7 +6,7 @@ You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubec
 
 **Build the images**
 
-Install go/dep (Go dependency management tool) using instructions at (https://github.com/golang/dep)
+Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep)
 Run `dep ensure`
 Build and push the image 
  - `make builder-image`
