@@ -89,7 +89,7 @@ sed -i 's/reserved/<b>gke-cluster-name</b>/g' deploy/kip-configmap.yaml
 Deploy kIP by running 
 
 ```
-kubctl apply -f deploy/.
+kubectl apply -f deploy/.
 ```
 
 References:
