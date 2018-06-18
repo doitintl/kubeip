@@ -8,7 +8,8 @@ You need a Kubernetes 1.10 or newer cluster. You will also need Docker and kubec
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) by running `dep ensure`
 
-Build and push the image: 
+Build and push the image:
+
  - Set project with `gcloud config set project my_project` and replace the my_project with your [project_id](https://cloud.google.com/storage/docs/projects)
  - Run `export PROJECT_ID=$(gcloud config list --format 'value(core.project)')`
  - Compile the kIP with `make builder-image`
@@ -67,19 +68,29 @@ kubectl create secret generic kip-key \
 
 **Create static reserved IP addresses:** 
 
-Create as many static IP addresses (this example creates 4 addresses) as you need with:
+Create as many static IP addresses as number of nodes in your GKE cluster (this example creates 4 addresses):
 
 ```
-gcloud compute addresses create ip1 ip2 ip3 ip4 \
+gcloud compute addresses create kip-ip1 kip-ip2 kip-ip3 kip-ip4 \
 --project=$PROJECT_ID \
 --region=us-central1
 ```
 
-Navigate to your [Google Cloud Console](https://console.cloud.google.com/networking/addresses/list) and add label **kip** to each of the created static IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
+Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
+
+```
+gcloud beta compute addresses update kip-ip1 kip-ip2 kip-ip3 kip-ip4 \
+--update-labels kip=reserved \
+--region us-central1
+```
 
 By default **kip** looks for label "kip" with a value "reserved". You can override this by setting `KIP_LABEl_KEY` and `KIP_LABEl_VALUE` in kip-configmap.yaml. 
 
-Deploy by running `kubctl apply -f deploy/.`
+Deploy kIP by running 
+
+```
+kubctl apply -f deploy/.
+```
 
 References:
 
