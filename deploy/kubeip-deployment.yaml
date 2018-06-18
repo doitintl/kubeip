@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kip
+  name: kubeip
   namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kip
+      app: kubeip
   template:
       metadata:
         labels:
-          app: kip
+          app: kubeip
       spec:
         priorityClassName: system-cluster-critical
         containers:
-        - name: "kip"
-          image: gcr.io/my-project/kip
+        - name: "kubeip"
+          image: gcr.io/my-project/kubeip
           imagePullPolicy: Always
           volumeMounts:
           - name: google-cloud-key
@@ -25,26 +25,26 @@ spec:
           - name: "KIP_LABEl_KEY"
             valueFrom:
               configMapKeyRef:
-                key: "KIP_LABEl_KEY"
-                name: "kip-config"
-          - name: "KIP_LABEl_VALUE"
+                key: "KUBEIP_LABEl_KEY"
+                name: "kubeip-config"
+          - name: "KUBEIP_LABEl_VALUE"
             valueFrom:
               configMapKeyRef:
-                key: "KIP_LABEl_VALUE"
-                name: "kip-config"
+                key: "KUBEIP_LABEl_VALUE"
+                name: "kubeip-config"
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /var/secrets/google/key.json
         restartPolicy: Always
         volumes:
           - name: google-cloud-key
             secret:
-              secretName: kip-key
+              secretName: kubeip-key
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: kip-rbac
+  name: kubeip-rbac
 subjects:
   - kind: ServiceAccount
     # Reference to upper's `metadata.name`
