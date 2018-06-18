@@ -21,6 +21,7 @@ Replace **us-central1** with the region where your GKE cluster resides:
 
 ```
 export GCP_REGION=us-central1
+export GKE_CLUSTER_NAME=kip-cluster
 ```
 
 **Build the images**
@@ -77,7 +78,7 @@ gcloud iam service-accounts keys create key.json \
 Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
 
 <pre>
-gcloud container clusters get-credentials <b>cluster_name</b> \
+gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 --region $GCP_REGION \
 --project $PROJECT_ID
 </pre> 
@@ -106,7 +107,7 @@ for i in {1..10}; do gcloud beta compute addresses update kip-ip$i --update-labe
 Adjust the deploy/kip-configmap.yaml with your GKE cluster name (replace the gke-cluster-name with your real GKE cluster name
 
 <pre>
-sed -i 's/reserved/<b>gke-cluster-name</b>/g' deploy/kip-configmap.yaml
+sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kip-configmap.yaml
 </pre>
 
 Adjust the deploy/kip-deployment.yaml to reflect your real container image path:
