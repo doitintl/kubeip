@@ -17,7 +17,7 @@ cd $GOPATH/src/kip
 
 **Set Environment Variables**
 
-Replace **us-central1** with the region where your GKE cluster resides:
+Replace **us-central1** with the region where your GKE cluster resides and **kip-cluster** with your real GKE cluster name
 
 ```
 export GCP_REGION=us-central1
