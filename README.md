@@ -18,13 +18,26 @@ Build and push the image
  - Tag the image using `docker tag  kip gcr.io/$PROJECT_ID/kip`
  - Push the image to Google Container Registry with `docker push gcr.io/$PROJECT_ID/kip`
 
-**Create a service account with permission the following roles**
+**Create IAM Service Account and obtain the Key in JSON format**
 
- - Kubernetes Engine Cluster Admin
- - Storage Admin
- - Compute Admin
+Create Service Account: `gcloud iam service-accounts create kip-service-account --display-name "kIP"`
+
+Attach required roles to the service account:
+
+```
+gcloud iam service-accounts add-iam-policy-binding kip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
+--member=serviceAccount:kip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
+--role='roles/container.clusterAdmin,roles/compute.storageAdmin,roles/compute.admin'
+```
+
+Generate the Key using the following command:
+
+```
+gcloud iam service-accounts keys create key.json \
+--iam-account kip-service-account@$PROJECT_ID.iam.gserviceaccount.com
+```
  
-**Download the key file in JSON format:**
+**Create Kubernetes Secret**
 
 Create secret by running `kubectl create secret generic kip-key --from-file=key.json=filename`
 
