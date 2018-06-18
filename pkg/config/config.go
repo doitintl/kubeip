@@ -28,12 +28,12 @@ type Config struct {
 }
 
 func setConfigDefaults() {
-	viper.SetDefault("LabelKey", "kip")
+	viper.SetDefault("LabelKey", "kubeip")
 	viper.SetDefault("LabelValue", "reserved")
 }
 
 func NewConfig() (*Config, error) {
-	viper.SetEnvPrefix("kip")
+	viper.SetEnvPrefix("kubeip")
 	viper.AutomaticEnv()
 	setConfigDefaults()
 	c := Config{

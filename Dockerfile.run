@@ -1,6 +1,6 @@
 FROM alpine:3.4
 RUN apk add --update ca-certificates
 
-COPY kip /bin/kubeip
+COPY kubeip /bin/kubeip
 
 ENTRYPOINT ["/bin/kubeip"]

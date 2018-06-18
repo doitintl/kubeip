@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  KIP_LABEl_KEY: "kubeip"
-  KIP_LABEl_VALUE: "reserved"
+  kubeip_LABEl_KEY: "kubeip"
+  kubeip_LABEl_VALUE: "reserved"
 kind: ConfigMap
 metadata:
   labels:

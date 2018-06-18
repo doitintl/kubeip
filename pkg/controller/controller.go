@@ -29,10 +29,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/doitintl/kip/pkg/compute"
-	cfg "github.com/doitintl/kip/pkg/config"
-	"github.com/doitintl/kip/pkg/types"
-	"github.com/doitintl/kip/pkg/utils"
+	"github.com/doitintl/kubeip/pkg/compute"
+	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/types"
+	"github.com/doitintl/kubeip/pkg/utils"
 	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,7 +90,7 @@ func Start(config *cfg.Config) {
 			},
 		},
 		&api_v1.Pod{},
-		0, //Skip resync
+		0, //Skubeip resync
 		cache.Indexers{},
 	)
 
@@ -111,7 +111,7 @@ func Start(config *cfg.Config) {
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
-	compute.Kip(instance, c.config)
+	compute.kubeip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	signal.Notify(sigterm, syscall.SIGINT)
@@ -135,19 +135,19 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 	})
 
 	return &Controller{
-		logger:    logrus.WithField("pkg", "kip-"+resourceType),
+		logger:    logrus.WithField("pkg", "kubeip-"+resourceType),
 		clientset: client,
 		informer:  informer,
 		queue:     queue,
 	}
 }
 
-// Run starts the kip controller
+// Run starts the kubeip controller
 func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	c.logger.Info("Starting kip controller")
+	c.logger.Info("Starting kubeip controller")
 	serverStartTime = time.Now().Local()
 
 	go c.informer.Run(stopCh)
@@ -157,7 +157,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	c.logger.Info("kip controller synced and ready")
+	c.logger.Info("kubeip controller synced and ready")
 
 	wait.Until(c.runWorker, time.Second, stopCh)
 }
@@ -219,7 +219,7 @@ func (c *Controller) processItem(newEvent Event) error {
 		if objectMeta.CreationTimestamp.Sub(serverStartTime).Seconds() > 0 {
 			if strings.HasPrefix(newEvent.key, prefix) {
 				node := newEvent.key[len(prefix):]
-				logrus.WithField("pkg", "kip-"+newEvent.resourceType).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
+				logrus.WithField("pkg", "kubeip-"+newEvent.resourceType).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				var inst types.Instance
 				inst.Name = node
 				inst.ProjectID = c.projectID

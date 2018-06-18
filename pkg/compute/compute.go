@@ -28,8 +28,8 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	cfg "github.com/doitintl/kip/pkg/config"
-	"github.com/doitintl/kip/pkg/types"
+	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/types"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -192,7 +192,7 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 		}
 	}
 }
-func Kip(instance <-chan types.Instance, config *cfg.Config) {
+func kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.Infof("Working on %s", inst.Name)

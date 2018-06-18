@@ -1,7 +1,7 @@
 .PHONY: default build builder-image binary-image test stop clean-images clean
 
-BUILDER = kip-builder
-BINARY = kip
+BUILDER = kubeip-builder
+BINARY = kubeip
 
 VERSION=
 BUILD=
