@@ -23,7 +23,7 @@ Create Service Account with this command
 
 ```
 gcloud iam service-accounts create kip-service-account \
---display-name "kIP"`
+--display-name "kIP"
 ```
 
 Attach required roles to the service account by running the following commands:
