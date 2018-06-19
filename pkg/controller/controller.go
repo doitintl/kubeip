@@ -111,7 +111,7 @@ func Start(config *cfg.Config) {
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
-	compute.kubeip(instance, c.config)
+	compute.Kubeip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	signal.Notify(sigterm, syscall.SIGINT)
