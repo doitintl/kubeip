@@ -218,7 +218,26 @@ func (c *Controller) processItem(newEvent Event) error {
 
 		if objectMeta.CreationTimestamp.Sub(serverStartTime).Seconds() > 0 {
 			if strings.HasPrefix(newEvent.key, prefix) {
+				kubeClient := utils.GetClient()
 				node := newEvent.key[len(prefix):]
+				var options meta_v1.GetOptions
+				options.Kind = "Node"
+				options.APIVersion = "1"
+				nodeMeta, err := kubeClient.CoreV1().Nodes().Get(node, options)
+				if err != nil {
+					logrus.Infof(err.Error())
+				}
+				labels := nodeMeta.Labels
+				if pool, ok := labels["cloud.google.com/gke-nodepool"]; ok {
+					logrus.Infof("Node pool found %s", pool)
+					if strings.ToLower(pool) != strings.ToLower(c.config.NodePool) {
+						return nil
+					}
+				} else {
+					logrus.Info("Did not found node pool")
+					return nil
+				}
+
 				logrus.WithField("pkg", "kubeip-"+newEvent.resourceType).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				var inst types.Instance
 				inst.Name = node
