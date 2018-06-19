@@ -192,7 +192,7 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 		}
 	}
 }
-func kubeip(instance <-chan types.Instance, config *cfg.Config) {
+func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.Infof("Working on %s", inst.Name)
