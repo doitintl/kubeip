@@ -16,7 +16,7 @@ spec:
         priorityClassName: system-cluster-critical
         containers:
         - name: "kubeip"
-          image: gcr.io/aviv-playground/kubeip
+          image: gcr.io/my-project/kubeip
           imagePullPolicy: Always
           volumeMounts:
           - name: google-cloud-key
