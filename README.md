@@ -1,5 +1,7 @@
 # KubeIP
 
+[![License](https://img.shields.io/github/license/doitintl/kubeIP.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/doitintl/kubeIP.svg?style=social&label=Stars&style=for-the-badge)](https://github.com/doitintl/kubeIP) [![Build Status](https://secure.travis-ci.org/doitintl/kubeIP.png?branch=master)](http://travis-ci.org/doitintl/kubeIP)
+
 Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
 **Prerequisites**
@@ -130,4 +132,4 @@ kubectl apply -f deploy/.
 
 References:
 
- - Event listing code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)
+ - Event listening code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)
