@@ -124,6 +124,8 @@ Adjust the deploy/kubeip-deployment.yaml to reflect your real container image pa
 sed -i "s/my-project/$PROJECT_ID/g" deploy/kubeip-deployment.yaml
 </pre>
 
+By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another nood-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes.
+
 Deploy kubeIP by running 
 
 ```
