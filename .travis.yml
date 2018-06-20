@@ -1,4 +1,8 @@
 language: go
+sudo: required
+
+services:
+  - docker
 
 env:
   - DEP_VERSION=0.4.1
@@ -14,7 +18,9 @@ before_install:
 install:
   -  $GOPATH/bin/dep ensure
 
-script: go build .
+script:
+    - if [[ $TRAVIS_BRANCH != "master" ]]; then go build . ; fi
+    - if [[ $TRAVIS_BRANCH == "master" ]]; then make builder-image &&make binary-image; fi
 
 notifications:
   email: false
