@@ -20,6 +20,8 @@ install:
   -  $GOPATH/bin/dep ensure
 
 script:
+- export BUILDDATE=`date +%Y-%m-%d\-%H:%M`
+- export VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
 - export BUILDER=kubeip-builder
 - export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
 - export REPO=doitintl/kubeip
