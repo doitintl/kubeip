@@ -6,12 +6,13 @@ Many applications need to be whitelisted by consumers based on source IP address
 
 If you just want to use KubeIP (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
-Edit `deploy/kubeip-configmap.yaml` file:
+Configure gcloud sdk by setting your default project:
 
- - Update the `KUBEIP_LABELVALUE` with your GKE cluster name
- - Update `KUBEIP_NODEPOOL` to match the name of your GKE node-pool on which kubeIP will operate
- 
-Set the required environment variables: 
+```
+gcloud config set project {{your project_id}
+```
+
+Set the environment variables: 
  
  ```
 export GCP_REGION=us-central1
@@ -74,6 +75,11 @@ for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-l
 <pre>
 sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 </pre>
+
+Make sure the `deploy/kubeip-configmap.yaml` file contains correct values:
+
+ - The `KUBEIP_LABELVALUE` should be your GKE cluster name
+ - The `KUBEIP_NODEPOOL` should match the name of your GKE node-pool on which kubeIP will operate
 
 Deploy kubeIP by running: 
 
