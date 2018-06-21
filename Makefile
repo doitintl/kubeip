@@ -10,6 +10,9 @@ GOCMD = go
 GOFLAGS ?= $(GOFLAGS:)
 LDFLAGS =
 
+BUILDDATE=`date +%Y-%m-%d\-%H:%M`
+VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
+
 default: build test
 
 build:
