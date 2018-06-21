@@ -1,14 +1,14 @@
-# KubeIP
+# What is KubeIP?
 
 Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
-# Deploy kubeIP without building from source
+# Deploy kubeIP (without building from source)
 
 If you just want to use KubeIP (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
-Edit deploy/kubeip-configmap.yaml file:
+Edit `deploy/kubeip-configmap.yaml` file:
 
- - Update the `KUBEIP_LABELVALUE` with your real GKE cluster name
+ - Update the `KUBEIP_LABELVALUE` with your GKE cluster name
  - Update `KUBEIP_NODEPOOL` to match the name of your GKE node-pool on which kubeIP will operate
  
 Set the required environment variables: 
@@ -75,9 +75,7 @@ for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-l
 sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 </pre>
 
-Adjust the deploy/kubeip-deployment.yaml to reflect your real container image path:
-
-Deploy kubeIP by running 
+Deploy kubeIP by running: 
 
 ```
 kubectl apply -f deploy/.
@@ -131,7 +129,7 @@ make binary-image
 Tag the image using: 
 
 ```
-docker tag  kubeip gcr.io/$PROJECT_ID/kubeip
+docker tag kubeip gcr.io/$PROJECT_ID/kubeip
 ```
 
 Finally, push the image to Google Container Registry with: 
@@ -199,9 +197,7 @@ sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 
 Adjust the deploy/kubeip-deployment.yaml to reflect your real container image path:
 
-<pre>
-sed -i "s/my-project/$PROJECT_ID/g" deploy/kubeip-deployment.yaml
-</pre>
+ - Edit the `image` to match your container image path, i.e. `gcr.io/$PROJECT_ID/kubeip`
 
 By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another nood-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes.
 
