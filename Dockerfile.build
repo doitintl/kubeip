@@ -10,7 +10,7 @@ RUN apk update && \
 ADD . "$GOPATH/src/github.com/doitintl/kubeip"
 
 RUN cd "$GOPATH/src/github.com/doitintl/kubeip" && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$VERSION"  -ldflags "-X main.build_date=$BUILD_DATE" -o /kubeip
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$VERSION -X main.build_date=$BUILD_DATE" -o /kubeip
 
 COPY Dockerfile.run /
 CMD tar -cf - -C / Dockerfile.run kubeip
