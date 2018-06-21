@@ -81,7 +81,7 @@ Deploy kubeIP by running:
 kubectl apply -f deploy/.
 ```
 
-# Build From Source
+# Deploy & Build From Source
 
 You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
@@ -195,7 +195,7 @@ Adjust the deploy/kubeip-configmap.yaml with your GKE cluster name (replace the 
 sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 </pre>
 
-Adjust the deploy/kubeip-deployment.yaml to reflect your real container image path:
+Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image path:
 
  - Edit the `image` to match your container image path, i.e. `gcr.io/$PROJECT_ID/kubeip`
 
