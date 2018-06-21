@@ -9,7 +9,7 @@ If you just want to use KubeIP (instead of building it from source yourself), pl
 Configure gcloud sdk by setting your default project:
 
 ```
-gcloud config set project {{your project_id}
+gcloud config set project {your project_id}
 ```
 
 Set the environment variables: 
