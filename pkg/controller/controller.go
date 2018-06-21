@@ -237,23 +237,19 @@ func (c *Controller) processItem(newEvent Event) error {
 					logrus.Info("Did not found node pool")
 					return nil
 				}
-
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				var inst types.Instance
+				if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
+					logrus.Infof("Zone pool found %s", nodeZone)
+					inst.Zone = nodeZone
+				} else {
+					logrus.Info("Did not find zone")
+					return nil
+				}
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				inst.Name = node
 				inst.ProjectID = c.projectID
-				zones, err := compute.ListClusterZones(c.projectID, c.clusterName)
-				if err == nil {
-					for _, zone := range zones {
-						inst.Zone = zone
-						c.instance <- inst
-						logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing node %s of cluster %s in zone %s", node, c.clusterName, zone)
-					}
-
-				} else
-				{
-					c.logger.Error(err)
-				}
+				c.instance <- inst
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing node %s of cluster %s in zone %s", node, c.clusterName, inst.Zone)
 				return nil
 			}
 		}
