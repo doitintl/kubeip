@@ -4,7 +4,87 @@
 
 Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
-**Prerequisites**
+**TL;DR; (ff you just want to use kubeIP)**
+If you just want to use KubeIP (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+
+Edit deploy/kubeip-configmap.yaml file:
+
+ - Update the `KUBEIP_LABELVALUE` with your real GKE cluster name
+ - Update `KUBEIP_NODEPOOL` to match the name of your GKE node-pool on which kubeIP will operate
+ 
+Set the required environment variables: 
+ 
+ ```
+export GCP_REGION=us-central1
+export GKE_CLUSTER_NAME=kubeip-cluster
+export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compute.storageAdmin" )
+export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
+```
+
+**Create IAM Service Account and obtain the Key in JSON format**
+
+Create Service Account with this command: 
+
+```
+gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
+```
+
+Attach required roles to the service account by running the following commands:
+
+```
+for role in "${roles[@]}"; do gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role $role;done
+```
+
+Generate the Key using the following command:
+
+```
+gcloud iam service-accounts keys create key.json \
+--iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
+```
+ 
+**Create Kubernetes Secret**
+
+Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
+
+<pre>
+gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
+--region $GCP_REGION \
+--project $PROJECT_ID
+</pre> 
+
+Create a Kubernetes secret by running:
+
+```
+kubectl create secret generic kubeip-key --from-file=key.json
+```
+
+**Create static reserved IP addresses:** 
+
+Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
+
+```
+for i in {1..10}; do gcloud compute addresses create kubeip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
+```
+
+Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name).
+
+```
+for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels kubeip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
+```
+
+<pre>
+sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
+</pre>
+
+Adjust the deploy/kubeip-deployment.yaml to reflect your real container image path:
+
+Deploy kubeIP by running 
+
+```
+kubectl apply -f deploy/.
+```
+
+**Build From Source**
 
 You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
