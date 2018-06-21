@@ -16,7 +16,7 @@ spec:
         priorityClassName: system-cluster-critical
         containers:
         - name: "kubeip"
-          image: hub.docker.com/r/doitintl/kubeip:latest
+          image: doitintl/kubeip:latest
           imagePullPolicy: Always
           volumeMounts:
           - name: google-cloud-key
