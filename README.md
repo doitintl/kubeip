@@ -1,10 +1,9 @@
 # KubeIP
 
-[![License](https://img.shields.io/github/license/doitintl/kubeIP.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/doitintl/kubeIP.svg?style=social&label=Stars&style=for-the-badge)](https://github.com/doitintl/kubeIP) [![Build Status](https://secure.travis-ci.org/doitintl/kubeIP.png?branch=master)](http://travis-ci.org/doitintl/kubeIP)
-
 Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
-**TL;DR; (ff you just want to use kubeIP)**
+# Deploy kubeIP without building from source
+
 If you just want to use KubeIP (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
 Edit deploy/kubeip-configmap.yaml file:
@@ -84,7 +83,7 @@ Deploy kubeIP by running
 kubectl apply -f deploy/.
 ```
 
-**Build From Source**
+# Build From Source
 
 You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
 
