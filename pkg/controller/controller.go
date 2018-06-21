@@ -238,7 +238,7 @@ func (c *Controller) processItem(newEvent Event) error {
 					return nil
 				}
 
-				logrus.WithField("pkg", "kubeip-"+newEvent.resourceType).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				var inst types.Instance
 				inst.Name = node
 				inst.ProjectID = c.projectID
@@ -247,7 +247,7 @@ func (c *Controller) processItem(newEvent Event) error {
 					for _, zone := range zones {
 						inst.Zone = zone
 						c.instance <- inst
-						logrus.Infof("Processing %s cluster name %s in zone %s", node, c.clusterName, zone)
+						logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing node %s of cluster %s in zone %s", node, c.clusterName, zone)
 					}
 
 				} else

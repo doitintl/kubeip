@@ -42,6 +42,6 @@ func main() {
 	logrus.WithFields(logrus.Fields{
 		"Cluster name": cluster,
 		"Project name": projectID,
-	}).Info(" starting")
+	}).Info("kubeIP is starting")
 	c.Run(config)
 }

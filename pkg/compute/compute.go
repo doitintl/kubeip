@@ -57,7 +57,7 @@ func ListClusterZones(projectID string, clusterName string) ([]string, error) {
 	}
 	for _, v := range list.Clusters {
 		if strings.Compare(strings.ToLower(clusterName), strings.ToLower(v.Name)) == 0 {
-			logrus.Infof("Cluster %q (%s) master_version: v%s zone %s", v.Name, v.Status, v.CurrentMasterVersion, v.Locations)
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "ListClusterZones"}).Infof("Cluster %q (%s) master_version: v%s zone %s", v.Name, v.Status, v.CurrentMasterVersion, v.Locations)
 			return v.Locations, nil
 		}
 
@@ -146,13 +146,17 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 		logrus.Infof(err.Error())
 		return err
 	}
-	logrus.Infof("Found reserved address %s", addr)
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Found reserved address %s", addr)
 	computeService, err := compute.New(hc)
+	_, err = computeService.Instances.Get(projectID,zone,instance).Do()
+	if err != nil {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Instance not found %s zone %s", instance, zone)
+		return err
+	}
 	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, "external-nat", "nic0").Do()
 	if err != nil {
 		logrus.Errorf("DeleteAccessConfig %q", err)
 		return err
-
 	}
 	waitForComplition(projectID, zone, op)
 	accessConfig := &compute.AccessConfig{
@@ -167,7 +171,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 		return err
 	}
 	waitForComplition(projectID, zone, op)
-	logrus.Infof("Replaced IP for %s new ip %s", instance, addr)
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone,  addr)
 	return nil
 
 }
@@ -195,7 +199,7 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
-		logrus.Infof("Working on %s", inst.Name)
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
 		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
 	}
 }
