@@ -1,6 +1,7 @@
 FROM golang:alpine
 MAINTAINER "Aviv Laufer <aviv.laufer@gmail.com>"
-
+ARG BUILD_DATE
+ARG VERSION
 RUN apk update && \
     apk add git build-base && \
     rm -rf /var/cache/apk/* && \
