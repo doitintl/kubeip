@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+
 	"github.com/doitintl/kubeip/pkg/compute"
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
@@ -55,6 +56,7 @@ type Controller struct {
 	projectID   string
 	clusterName string
 	config      *cfg.Config
+	ticker      *time.Ticker
 }
 
 // Event indicate the informerEvent
@@ -104,13 +106,16 @@ func Start(config *cfg.Config) {
 		logrus.Fatal(err)
 	}
 	c.config = config
-
+	c.ticker = time.NewTicker(5 * time.Minute)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	//TODO Set size
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
+	if c.config.ForceAssignment {
+		go c.forceAssignment()
+	}
 	compute.Kubeip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
@@ -256,4 +261,45 @@ func (c *Controller) processItem(newEvent Event) error {
 
 	}
 	return nil
+}
+
+func (c *Controller) processAllNodes() {
+	kubeClient := utils.GetClient()
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
+	nodelist, _ := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	for _, node := range nodelist.Items {
+		labels := node.GetLabels()
+		if pool, ok := labels["cloud.google.com/gke-nodepool"]; ok {
+			if strings.ToLower(pool) != strings.ToLower(c.config.NodePool) {
+				continue
+			}
+		} else {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Did not found node pool")
+			continue
+		}
+		var inst types.Instance
+		if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
+			inst.Zone = nodeZone
+		} else {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Did not find zone")
+			continue
+		}
+		inst.ProjectID = c.projectID
+		inst.Name = node.GetName()
+		if !compute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
+			logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "processAllNodes"}).Infof("Found un assigned node %s", inst.Name)
+			c.instance <- inst
+		}
+
+	}
+
+}
+
+func (c *Controller) forceAssignment() {
+	logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "forceAssignment"}).Info("Starting forceAssignment")
+	c.processAllNodes()
+	for _ = range c.ticker.C {
+		logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "processAllNodes"}).Info("On Ticker")
+		c.processAllNodes()
+	}
 }

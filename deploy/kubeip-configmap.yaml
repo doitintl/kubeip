@@ -3,6 +3,7 @@ data:
   KUBEIP_LABELKEY: "kubeip"
   KUBEIP_LABELVALUE: "reserved"
   KUBEIP_NODEPOOL: "default-pool"
+  KUBEIP_FORCEASSIGNMENT: "true"
 kind: ConfigMap
 metadata:
   labels:

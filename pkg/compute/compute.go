@@ -113,7 +113,7 @@ func ProjectName() (string, error) {
 	return string(project), nil
 }
 
-func FindAddress(projectID string, region string, config *cfg.Config) (string, error) {
+func FindFreeAddress(projectID string, region string, config *cfg.Config) (string, error) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
@@ -141,14 +141,14 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 		logrus.Fatalf("Could not get authenticated client: %v", err)
 	}
 	region := zone[:len(zone)-2]
-	addr, err := FindAddress(projectID, region, config)
+	addr, err := FindFreeAddress(projectID, region, config)
 	if err != nil {
 		logrus.Infof(err.Error())
 		return err
 	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Found reserved address %s", addr)
 	computeService, err := compute.New(hc)
-	_, err = computeService.Instances.Get(projectID,zone,instance).Do()
+	_, err = computeService.Instances.Get(projectID, zone, instance).Do()
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Instance not found %s zone %s", instance, zone)
 		return err
@@ -171,7 +171,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 		return err
 	}
 	waitForComplition(projectID, zone, op)
-	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone,  addr)
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr)
 	return nil
 
 }
@@ -196,6 +196,35 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 		}
 	}
 }
+
+func IsInstanceUsesReservedIP(projectID string, instance string, zone string, config *cfg.Config) bool {
+	region := zone[:len(zone)-2]
+	ctx := context.Background()
+	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	computeService, err := compute.New(hc)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	filter := "(labels." + config.LabelKey + "=" + config.LabelValue + ")"
+	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=IN_USE) AND " + filter).Do()
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+
+	for _, addr := range addresses.Items {
+		if strings.Contains(addr.Users[0], instance) {
+			return true
+		}
+	}
+	return false
+}
+
 func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
