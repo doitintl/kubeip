@@ -88,6 +88,8 @@ Deploy kubeIP by running:
 kubectl apply -f deploy/.
 ```
 
+After assigning an IP address to a node kubeip will also crate a label for that node `kubip_assigned` with the value of the IP address (`.` are replaced with `_`) 
+
 # Deploy & Build From Source
 
 You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
