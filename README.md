@@ -80,7 +80,7 @@ Make sure the `deploy/kubeip-configmap.yaml` file contains correct values:
 
  - The `KUBEIP_LABELVALUE` should be your GKE cluster name
  - The `KUBEIP_NODEPOOL` should match the name of your GKE node-pool on which kubeIP will operate
- - The `KUBEIP_FORCEASSIGNMENT` - defaults to true
+ - The `KUBEIP_FORCEASSIGNMENT` - controls whether kubeIP should assign static IPs to existing nodes in the node-pool and defaults to true
 
 Deploy kubeIP by running: 
 
@@ -206,7 +206,9 @@ Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image 
 
  - Edit the `image` to match your container image path, i.e. `gcr.io/$PROJECT_ID/kubeip`
 
-By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another nood-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes. `KUBEIP_FORCEASSIGNMENT` which defaults to true will check on startup and every 5 minutes if there are some nodes in the pool that are not assigned to a reserved address. If such nodes will be found then kubeip will assign a reserved address (if one is available to them)
+By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another nood-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes. 
+
+The `KUBEIP_FORCEASSIGNMENT` which defaults to true will check on startup and every 5 minutes if there are some nodes in the node-pool that are not assigned to a reserved address. If such nodes will be found then kubeIP will assign a reserved address (if one is available to them)
 
 Deploy kubeIP by running 
 
