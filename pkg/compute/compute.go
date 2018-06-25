@@ -30,6 +30,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
+	"github.com/doitintl/kubeip/pkg/utils"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -172,6 +173,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 	}
 	waitForComplition(projectID, zone, op)
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr)
+	utils.TagNode(instance, addr)
 	return nil
 
 }
@@ -229,6 +231,6 @@ func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
-		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
+		replaceIP(inst.ProjectID, inst.Zone, inst.Name,config)
 	}
 }

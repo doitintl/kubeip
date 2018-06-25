@@ -21,6 +21,8 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
 	"github.com/Sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
 	batch_v1 "k8s.io/api/batch/v1"
@@ -29,6 +31,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	types_v1 "k8s.io/apimachinery/pkg/types"
 )
 
 // GetClient returns a k8s clientset to the request from inside of cluster
@@ -77,4 +80,17 @@ func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
 		objectMeta = object.ObjectMeta
 	}
 	return objectMeta
+}
+
+func TagNode(node string, ip string)  {
+	kubeClient := GetClient()
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip)
+	dashIp := strings.Replace(ip, ".", "-", 4)
+	labelString := "{" + "\""+"kubip_assigned"+"\":\""+dashIp+"\"" + "}"
+	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+	_, err := kubeClient.CoreV1().Nodes().Patch(node,types_v1.MergePatchType, []byte(patch))
+	if err != nil {
+		logrus.Error(err)
+	}
+
 }
