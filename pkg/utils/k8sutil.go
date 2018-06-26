@@ -23,6 +23,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"errors"
 	"github.com/Sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
 	batch_v1 "k8s.io/api/batch/v1"
@@ -92,5 +93,23 @@ func TagNode(node string, ip string)  {
 	if err != nil {
 		logrus.Error(err)
 	}
+
+}
+
+func GetNodeByIP(ip string) (string, error){
+	kubeClient := GetClient()
+	dashIp := strings.Replace(ip, ".", "-", 4)
+	label := fmt.Sprintf("kubip_assigned=%v", dashIp)
+	l, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
+		LabelSelector: label,
+	})
+	if err != nil {
+		logrus.Error(err)
+		return "",err
+	}
+	if len(l.Items) == 0 {
+		return "",errors.New("Did not found matching node with IP")
+	}
+	return l.Items[0].GetName(), nil
 
 }
