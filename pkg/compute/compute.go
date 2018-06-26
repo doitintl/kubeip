@@ -173,6 +173,10 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 	}
 	waitForComplition(projectID, zone, op)
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr)
+	oldNode, err := utils.GetNodeByIP(addr)
+	if err == nil {
+		utils.TagNode(oldNode, "0.0.0.0")
+	}
 	utils.TagNode(instance, addr)
 	return nil
 
