@@ -37,6 +37,12 @@ spec:
               configMapKeyRef:
                 key: "KUBEIP_NODEPOOL"
                 name: "kubeip-config"
+          - name: "KUBEIP_FORCEASSIGNMENT"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_FORCEASSIGNMENT"
+                name: "kubeip-config"
+
 
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /var/secrets/google/key.json
