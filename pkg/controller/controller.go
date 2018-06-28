@@ -30,8 +30,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
-	"github.com/doitintl/kubeip/pkg/compute"
 	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/kipcompute"
 	"github.com/doitintl/kubeip/pkg/types"
 	"github.com/doitintl/kubeip/pkg/utils"
 	api_v1 "k8s.io/api/core/v1"
@@ -97,11 +97,11 @@ func Start(config *cfg.Config) {
 	)
 
 	c := newResourceController(kubeClient, informer, "node")
-	c.projectID, err = compute.ProjectName()
+	c.projectID, err = kipcompute.ProjectName()
 	if err != nil {
 		logrus.Fatal(err)
 	}
-	c.clusterName, err = compute.ClusterName()
+	c.clusterName, err = kipcompute.ClusterName()
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func Start(config *cfg.Config) {
 	if c.config.ForceAssignment {
 		go c.forceAssignment()
 	}
-	compute.Kubeip(instance, c.config)
+	kipcompute.Kubeip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	signal.Notify(sigterm, syscall.SIGINT)
@@ -286,8 +286,8 @@ func (c *Controller) processAllNodes() {
 		}
 		inst.ProjectID = c.projectID
 		inst.Name = node.GetName()
-		if !compute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
-			logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "processAllNodes"}).Infof("Found un assigned node %s", inst.Name)
+		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found un assigned node %s", inst.Name)
 			c.instance <- inst
 		}
 
@@ -296,10 +296,40 @@ func (c *Controller) processAllNodes() {
 }
 
 func (c *Controller) forceAssignment() {
-	logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "forceAssignment"}).Info("Starting forceAssignment")
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Starting forceAssignment")
 	c.processAllNodes()
+	c.assignMissingTags()
 	for _ = range c.ticker.C {
-		logrus.WithFields(logrus.Fields{"pkg":"kubeip" , "function": "processAllNodes"}).Info("On Ticker")
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("On Ticker")
 		c.processAllNodes()
+		c.assignMissingTags()
 	}
+}
+
+func (c *Controller) assignMissingTags() {
+	kubeClient := utils.GetClient()
+	label := fmt.Sprintf("!kubip_assigned,cloud.google.com/gke-nodepool=%s", c.config.NodePool)
+	nodelist, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
+		LabelSelector: label,
+	})
+	if err != nil {
+		logrus.Error(err)
+		return
+
+	}
+	for _, node := range nodelist.Items {
+		labels := node.GetLabels()
+		if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
+			if err != nil {
+				logrus.Fatalf("Could not get authenticated client: %v", err)
+				continue
+			}
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s",node.GetName())
+			kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone)
+
+		} else {
+			continue
+		}
+	}
+
 }
