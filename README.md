@@ -17,7 +17,6 @@ Set the environment variables:
  ```
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kubeip-cluster
-export roles=( "roles/compute.instanceAdmin" "roles/container.viewer" )
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
@@ -29,10 +28,11 @@ Create Service Account with this command:
 gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
 ```
 
-Attach required roles to the service account by running the following commands:
+Create and attach custom kubeip role to the service account by running the following commands:
 
 ```
-for role in "${roles[@]}"; do gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role $role;done
+gcloud iam roles create kubeip --project $PROJECT_ID --file roles.yaml
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role kubeip
 ```
 
 Generate the Key using the following command:
