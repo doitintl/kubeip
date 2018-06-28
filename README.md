@@ -32,7 +32,8 @@ Create and attach custom kubeip role to the service account by running the follo
 
 ```
 gcloud iam roles create kubeip --project $PROJECT_ID --file roles.yaml
-gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role kubeip
+
+gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role projects/$PROJECT_ID/roles/kubeip
 ```
 
 Generate the Key using the following command:
