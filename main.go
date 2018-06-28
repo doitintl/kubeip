@@ -23,8 +23,8 @@ package main
 import (
 	"github.com/Sirupsen/logrus"
 	c "github.com/doitintl/kubeip/pkg/client"
-	"github.com/doitintl/kubeip/pkg/compute"
 	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/kipcompute"
 )
 
 var config *cfg.Config
@@ -33,19 +33,19 @@ var build_date string
 
 func main() {
 	config, _ = cfg.NewConfig()
-	cluster, err := compute.ClusterName()
+	cluster, err := kipcompute.ClusterName()
 	if err != nil {
 		logrus.Info(err)
 	}
-	projectID, err := compute.ProjectName()
+	projectID, err := kipcompute.ProjectName()
 	if err != nil {
 		logrus.Info(err)
 	}
 	logrus.WithFields(logrus.Fields{
 		"Cluster name": cluster,
 		"Project name": projectID,
-		"Version": version,
-		"Build Date": build_date,
+		"Version":      version,
+		"Build Date":   build_date,
 	}).Info("kubeIP is starting")
 	c.Run(config)
 }

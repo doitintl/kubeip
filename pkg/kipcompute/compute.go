@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package compute
+package kipcompute
 
 import (
 	"errors"
@@ -164,7 +164,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 		Name:  "External NAT",
 		Type:  "ONE_TO_ONE_NAT",
 		NatIP: addr,
-		Kind:  "compute#accessConfig",
+		Kind:  "kipcompute#accessConfig",
 	}
 	op, err = computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
 	if err != nil {
@@ -237,4 +237,57 @@ func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
 		replaceIP(inst.ProjectID, inst.Zone, inst.Name,config)
 	}
+}
+
+
+func IsAddressReserved (ip string, region string, projectID string) bool {
+	ctx := context.Background()
+	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	computeService, err := compute.New(hc)
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+	filter := "address=" + "\"" + ip + "\""
+	addresses, err := computeService.Addresses.List(projectID, region).Filter(filter).Do()
+	if err != nil {
+		logrus.Error(err)
+		return false
+	}
+
+	if len(addresses.Items) != 0 {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "IsAddressReserved"}).Infof("Node ip is reserved %s",ip)
+		return true
+	}
+	return false
+
+}
+
+func AddTagIfMissing(projectID string, instance string, zone string) {
+	ctx := context.Background()
+	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
+	if err != nil {
+		logrus.Fatalf("Could not get authenticated client: %v", err)
+		return
+	}
+	computeService, err := compute.New(hc)
+	inst, err := computeService.Instances.Get(projectID, zone, instance).Do()
+	if err != nil {
+		return
+	}
+	var ip string
+	for _, config := range inst.NetworkInterfaces[0].AccessConfigs {
+		if config.NatIP != "" {
+			ip =  config.NatIP
+		}
+	}
+	if IsAddressReserved(ip,zone[:len(zone)-2],projectID) {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "AddTagIfMissing"}).Infof("Tagging %s", instance)
+		utils.TagNode(instance,ip)
+	}
+
 }

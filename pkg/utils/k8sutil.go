@@ -21,18 +21,19 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-	"errors"
+
 	"github.com/Sirupsen/logrus"
 	apps_v1 "k8s.io/api/apps/v1"
 	batch_v1 "k8s.io/api/batch/v1"
 	api_v1 "k8s.io/api/core/v1"
 	ext_v1beta1 "k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	types_v1 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	types_v1 "k8s.io/apimachinery/pkg/types"
 )
 
 // GetClient returns a k8s clientset to the request from inside of cluster
@@ -49,7 +50,6 @@ func GetClient() kubernetes.Interface {
 
 	return clientset
 }
-
 
 // GetObjectMetaData returns metadata of a given k8s object
 func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
@@ -83,20 +83,20 @@ func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
 	return objectMeta
 }
 
-func TagNode(node string, ip string)  {
+func TagNode(node string, ip string) {
 	kubeClient := GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip)
 	dashIp := strings.Replace(ip, ".", "-", 4)
-	labelString := "{" + "\""+"kubip_assigned"+"\":\""+dashIp+"\"" + "}"
+	labelString := "{" + "\"" + "kubip_assigned" + "\":\"" + dashIp + "\"" + "}"
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
-	_, err := kubeClient.CoreV1().Nodes().Patch(node,types_v1.MergePatchType, []byte(patch))
+	_, err := kubeClient.CoreV1().Nodes().Patch(node, types_v1.MergePatchType, []byte(patch))
 	if err != nil {
 		logrus.Error(err)
 	}
 
 }
 
-func GetNodeByIP(ip string) (string, error){
+func GetNodeByIP(ip string) (string, error) {
 	kubeClient := GetClient()
 	dashIp := strings.Replace(ip, ".", "-", 4)
 	label := fmt.Sprintf("kubip_assigned=%v", dashIp)
@@ -105,10 +105,10 @@ func GetNodeByIP(ip string) (string, error){
 	})
 	if err != nil {
 		logrus.Error(err)
-		return "",err
+		return "", err
 	}
 	if len(l.Items) == 0 {
-		return "",errors.New("Did not found matching node with IP")
+		return "", errors.New("Did not found matching node with IP")
 	}
 	return l.Items[0].GetName(), nil
 
