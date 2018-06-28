@@ -1,6 +1,4 @@
-# What is KubeIP? [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Google%20Kubernetes%20Engine%20without%20going%20NAT%20with%20kubeIP!%20&url=https://kubeip.com&via=avivl&hashtags=Kubernetes,GCP,GKE)
-
-[![GitHub stars](https://img.shields.io/github/stars/doitintl/kubeIP.svg?style=social&label=Stars&style=for-the-badge)](https://github.com/doitintl/kubeIP) [![Build Status](https://secure.travis-ci.org/doitintl/kubeIP.png?branch=master)](http://travis-ci.org/doitintl/kubeIP)
+# What is KubeIP?
 
 Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
 
@@ -19,7 +17,7 @@ Set the environment variables:
  ```
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kubeip-cluster
-export roles=( "roles/compute.admin" "roles/container.clusterAdmin" "roles/compute.storageAdmin" )
+export roles=( "roles/compute.instanceAdmin" "roles/container.clusterAdmin" )
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
