@@ -17,7 +17,7 @@ Set the environment variables:
  ```
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kubeip-cluster
-export roles=( "roles/compute.instanceAdmin" "roles/container.clusterAdmin" )
+export roles=( "roles/compute.instanceAdmin" "roles/container.viewer" )
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
