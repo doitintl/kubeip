@@ -113,9 +113,7 @@ func Start(config *cfg.Config) {
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
-	if c.config.ForceAssignment {
-		go c.forceAssignment()
-	}
+	go c.forceAssignment()
 	kipcompute.Kubeip(instance, c.config)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
@@ -296,12 +294,16 @@ func (c *Controller) processAllNodes() {
 }
 
 func (c *Controller) forceAssignment() {
-	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Starting forceAssignment")
-	c.processAllNodes()
+	if c.config.ForceAssignment {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Starting forceAssignment")
+		c.processAllNodes()
+	}
 	c.assignMissingTags()
 	for _ = range c.ticker.C {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("On Ticker")
-		c.processAllNodes()
+		if c.config.ForceAssignment {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("On Ticker")
+			c.processAllNodes()
+		}
 		c.assignMissingTags()
 	}
 }
