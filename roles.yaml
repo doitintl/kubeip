@@ -2,26 +2,12 @@ title: "kubeip"
 description: "required permissions to run KubeIP"
 stage: "GA"
 includedPermissions:
-- compute.addresses.get
 - compute.addresses.list
-- compute.addresses.use
-- compute.globalAddresses.get
-- compute.globalAddresses.list
-- compute.globalAddresses.use
 - compute.instances.addAccessConfig
 - compute.instances.deleteAccessConfig
 - compute.instances.get
 - compute.instances.list
-- compute.instances.setLabels
-- compute.instances.setMetadata
-- compute.instances.setTags
-- compute.networks.useExternalIp
 - compute.projects.get
-- compute.regions.get
-- compute.regions.list
-- compute.subnetworks.useExternalIp
-- compute.zones.get
-- compute.zones.list
 - container.clusters.get
 - container.clusters.list
 - resourcemanager.projects.get
