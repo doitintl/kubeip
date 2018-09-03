@@ -129,6 +129,7 @@ func FindFreeAddress(projectID string, region string, config *cfg.Config) (strin
 	filter := "(labels." + config.LabelKey + "=" + config.LabelValue + ")"
 	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
 	if err != nil {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "FindFreeAddress"}).Errorf("Failed to list IP addresses in region %s: %q", region, err)
 		return "", err
 	}
 
@@ -155,7 +156,7 @@ func replaceIP(projectID string, zone string, instance string, config *cfg.Confi
 	computeService, err := compute.New(hc)
 	_, err = computeService.Instances.Get(projectID, zone, instance).Do()
 	if err != nil {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Instance not found %s zone %s", instance, zone)
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
 		return err
 	}
 	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, "external-nat", "nic0").Do()
