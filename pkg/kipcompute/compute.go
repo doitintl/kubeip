@@ -127,7 +127,11 @@ func FindFreeAddress(projectID string, region string, config *cfg.Config) (strin
 		return "", err
 	}
 	filter := "(labels." + config.LabelKey + "=" + config.LabelValue + ")"
-	addresses, _ := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
+	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
+	if err != nil {
+		return "", err
+	}
+
 	if len(addresses.Items) != 0 {
 		return addresses.Items[0].Address, nil
 	}
