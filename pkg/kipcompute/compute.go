@@ -239,12 +239,11 @@ func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
-		replaceIP(inst.ProjectID, inst.Zone, inst.Name,config)
+		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
 	}
 }
 
-
-func IsAddressReserved (ip string, region string, projectID string) bool {
+func IsAddressReserved(ip string, region string, projectID string) bool {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
@@ -264,7 +263,7 @@ func IsAddressReserved (ip string, region string, projectID string) bool {
 	}
 
 	if len(addresses.Items) != 0 {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "IsAddressReserved"}).Infof("Node ip is reserved %s",ip)
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "IsAddressReserved"}).Infof("Node ip is reserved %s", ip)
 		return true
 	}
 	return false
@@ -286,12 +285,12 @@ func AddTagIfMissing(projectID string, instance string, zone string) {
 	var ip string
 	for _, config := range inst.NetworkInterfaces[0].AccessConfigs {
 		if config.NatIP != "" {
-			ip =  config.NatIP
+			ip = config.NatIP
 		}
 	}
-	if IsAddressReserved(ip,zone[:len(zone)-2],projectID) {
+	if IsAddressReserved(ip, zone[:len(zone)-2], projectID) {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "AddTagIfMissing"}).Infof("Tagging %s", instance)
-		utils.TagNode(instance,ip)
+		utils.TagNode(instance, ip)
 	}
 
 }
