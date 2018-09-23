@@ -1,3 +1,7 @@
+#  We need to get RBAC permissions first with
+#  kubectl create clusterrolebinding cluster-admin-binding \
+#    --clusterrole cluster-admin --user <user email>
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -52,18 +56,40 @@ spec:
             secret:
               secretName: kubeip-key
 
+
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeip-sa
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubeip-sa
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get","list","watch","patch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get","list","watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: kubeip-rbac
+  name: kubeip-sa
 subjects:
   - kind: ServiceAccount
-    # Reference to upper's `metadata.name`
-    name: default
-    # Reference to upper's `metadata.namespace`
+    name: kubeip-sa
     namespace: default
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: kubeip-sa
   apiGroup: rbac.authorization.k8s.io
