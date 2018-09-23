@@ -58,7 +58,11 @@ Create a Kubernetes secret by running:
 ```
 kubectl create secret generic kubeip-key --from-file=key.json
 ```
-
+**We need to get RBAC permissions first with**
+```
+kubectl create clusterrolebinding cluster-admin-binding \
+   --clusterrole cluster-admin --user <user email>
+```
 **Create static reserved IP addresses:** 
 
 Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
@@ -184,6 +188,12 @@ Create a Kubernetes secret by running:
 
 ```
 kubectl create secret generic kubeip-key --from-file=key.json
+```
+
+**We need to get RBAC permissions first with**
+```
+kubectl create clusterrolebinding cluster-admin-binding \
+   --clusterrole cluster-admin --user <user email>
 ```
 
 **Create static reserved IP addresses:** 
