@@ -74,7 +74,7 @@ const maxRetries = 5
 
 const prefix = "kube-system/kube-proxy-"
 
-func Start(config *cfg.Config) {
+func Start(config *cfg.Config) error {
 	var kubeClient kubernetes.Interface
 	_, err := rest.InClusterConfig()
 	if err != nil {
@@ -100,10 +100,12 @@ func Start(config *cfg.Config) {
 	c.projectID, err = kipcompute.ProjectName()
 	if err != nil {
 		logrus.Fatal(err)
+		return err
 	}
 	c.clusterName, err = kipcompute.ClusterName()
 	if err != nil {
 		logrus.Fatal(err)
+		return err
 	}
 	c.config = config
 	c.ticker = time.NewTicker(5 * time.Minute)
@@ -120,6 +122,7 @@ func Start(config *cfg.Config) {
 	signal.Notify(sigterm, syscall.SIGINT)
 	<-sigterm
 
+	return nil
 }
 
 func newResourceController(client kubernetes.Interface, informer cache.SharedIndexInformer, resourceType string) *Controller {
@@ -326,7 +329,7 @@ func (c *Controller) assignMissingTags() {
 				logrus.Fatalf("Could not get authenticated client: %v", err)
 				continue
 			}
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s",node.GetName())
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
 			kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone)
 
 		} else {
