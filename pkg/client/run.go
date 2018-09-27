@@ -25,6 +25,6 @@ import (
 	"github.com/doitintl/kubeip/pkg/controller"
 )
 
-func Run(config *cfg.Config) {
-	controller.Start(config)
+func Run(config *cfg.Config) error {
+	return controller.Start(config)
 }

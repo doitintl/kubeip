@@ -105,7 +105,7 @@ You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.
 Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
 
 ```
-git clone https://github.com/doitintl/kubeIP.git $GOPATH/src/kubeip
+git clone https://github.com/doitintl/kubeip.git $GOPATH/src/kubeip
 cd $GOPATH/src/kubeip 
 ```
 

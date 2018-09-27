@@ -35,11 +35,13 @@ func main() {
 	config, _ = cfg.NewConfig()
 	cluster, err := kipcompute.ClusterName()
 	if err != nil {
-		logrus.Info(err)
+		logrus.Fatal(err)
+		panic(err)
 	}
 	projectID, err := kipcompute.ProjectName()
 	if err != nil {
-		logrus.Info(err)
+		logrus.Fatal(err)
+		panic(err)
 	}
 	logrus.WithFields(logrus.Fields{
 		"Cluster name": cluster,
@@ -47,5 +49,9 @@ func main() {
 		"Version":      version,
 		"Build Date":   build_date,
 	}).Info("kubeIP is starting")
-	c.Run(config)
+	err = c.Run(config)
+	if err != nil {
+		logrus.Fatal(err)
+		panic(err)
+	}
 }
