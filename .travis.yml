@@ -12,11 +12,9 @@ go:
 - 1.10.2
 
 script:
-- export BUILD_DATE=`date +%Y-%m-%d\-%H:%M`
-- export VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
 - export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
 - export REPO=doitintl/kubeip
-- docker build -t $REPO:$TAG --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile .
+- docker build -t $REPO:$TAG -f Dockerfile .
 
 after_success:
 - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
