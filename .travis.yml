@@ -5,28 +5,16 @@ services:
 - docker
 
 env:
-  matrix:
-  - DEP_VERSION=0.4.1
   global:
   - secure: Uhwe0SJzDINKpulrz4iKSvBchv/4w/PdeP0+BIM+5V0F4M4/v+BYk0cFS3cOiyyNXrnxL4wl0guzhLg1uWt9ZXEd4eXUyFgbeZ52C8pzRgCahIpSc3XFqYaFoxkdMKTUjfbsuUbOcCwlaIzM8QvfXGkw6Y5Gs9rPbb9U12qgthafLYFvyOXn/V5ddFsDvm3PT8Nr8AQWIDtuXwi9vEsyADZiOxVXSZSoThYc4vshGL9nr8kTAlJ5oO0DNTeAmoMgBYysqNr5R/3RZTvGVH3BJIWINLTZxVgkRsbSzeFMjfEKrmLBlYYZRg/tL//yzqNDRyvhD1G3oEiqDQC+bZQ3BNy0ok2L4+ytDfAPk7S31dZ/gcb2RCIeMMN2PuBpmmTZyfY921A9VEcNdq8JIXXLQOr9Axi0EAbLCsBetcoqXj+6tSU1/N3/pv1WT192MoGCvzM3A3he0KBLFTky1ZCwGbGl8QogP61ku1fgp9oU4VjwaT4gDsJxMJ0pgXpPmZy11oUwH5V0xpF+9zQ7L0tIyuYW+064SgPM70vqtUSkUQ6Tvy61AKfJY9nZfKlx3Xr0uUwJEx33yT6BmMPNDcYkT3ENfCtaYAhF/sxQijrz/vdhyK0oiKpSYwowbxMCpCY/Qy8HShoSqqKJsjjtPF/lvKgWGr0b/spC6ei50pqD6Zk=
   - secure: RvXxbo3+WYXgVfLHycauP4ePoLzjiG0L/iqEXOOyRvThIBO/2CjAJebPzxStd0T8UKmgQQuY6sPGA+gzTKqRm7X3h8i++BLuVGN/ohmug6SqoAt+b5DlAc571CpnRDdDuPWbiStLZFHfFTpcJn3NPe2h6dA/JAaPeUwdWjiGueR/cEpfuqINQnZh6F0IY6vFN0KU5kOh8LSn+WwukR/EtlDyGINMR6yUHpVF+q137L4aPUKeLpztw+6aOtU5KmyciYNG6SGckj5WZedAu4miPtH/jLD+UaQh3Tr4dGWBPduis94M+bE9seMEBDH83HF7+BUkNgRsQoKY85Gntu4apNQA0G04hN26fodkZCzvgXuISlmhP4DaemeEDImT7tWesL5Wms9GtKGpDfdWqjfHh9Vaq9AuGsloEW7CyT6+FuLBQErJMSu27jWXgSNwZsT9DpEUwZDG7lFm1OZqrLM/SUBGAsmHDswG7H1wlFD5aUd01CqSqKwMoEBj8BCqVRO+WtKHjsIZvCXgudlZySlLS5di15nYDaZYPQ+KB0/CpS0NaTP6k3KF1zmtWT7T2jKdFv9Sfgji4eYvvKubVLjsHmT1RsbFmCoDFhpKDNvYC/XlERzmAJYFyRdvELF8EjWpadJv/rR22PexyGCRoMe/17WGRGXMCEtpZiDTYKYDquc=
 go:
 - 1.10.2
-before_install:
-- curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64
-  -o $GOPATH/bin/dep
-- chmod +x $GOPATH/bin/dep
-install:
-  -  $GOPATH/bin/dep ensure
 
 script:
-- export BUILD_DATE=`date +%Y-%m-%d\-%H:%M`
-- export VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
-- export BUILDER=kubeip-builder
 - export TAG=`if [ $TRAVIS_BRANCH == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH; fi`
 - export REPO=doitintl/kubeip
-- docker build -t $BUILDER --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile.build .
-- docker run --rm $BUILDER | docker build -t $REPO:$TAG -f Dockerfile.run -
+- docker build -t $REPO:$TAG -f Dockerfile .
 
 after_success:
 - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin

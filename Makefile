@@ -1,6 +1,5 @@
-.PHONY: default build builder-image binary-image test stop clean-images clean
+.PHONY: default build image test stop clean-image clean
 
-BUILDER = kubeip-builder
 BINARY = kubeip
 
 
@@ -16,20 +15,17 @@ default: build test
 build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
-    builder-image:
-	@docker build -t "${BUILDER}" --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE}  -f Dockerfile.build .
-
-binary-image: builder-image
-	@docker run --rm "${BUILDER}" | docker build -t "${BINARY}" -f Dockerfile.run -
+image:
+	@docker build -t "${BINARY}" --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile .
 
 test:
 	"$(GOCMD)" test -race -v $(shell go list ./... | grep -v '/vendor/')
 
 stop:
-	@docker stop "${BINARY}"
+	@docker stop "${BINARY}" || true # Do not fail if container does not exist
 
-clean-images: stop
-	@docker rmi "${BUILDER}" "${BINARY}"
+clean-image: stop
+	@docker rmi "${BINARY}" || true # Do not fail if image does not exist
 
 clean:
 	"$(GOCMD)" clean -i
