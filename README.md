@@ -105,8 +105,9 @@ You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.
 Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
 
 ```
-git clone https://github.com/doitintl/kubeip.git $GOPATH/src/kubeip
-cd $GOPATH/src/kubeip 
+mkdir -p $GOPATH/src/doitintl/kubeip
+git clone https://github.com/doitintl/kubeip.git $GOPATH/src/doitintl/kubeip
+cd $GOPATH/src/doitintl/kubeip
 ```
 
 **Set Environment Variables**
@@ -119,7 +120,7 @@ export GKE_CLUSTER_NAME=kubeip-cluster
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
 
-**Build kubeIP's container image**
+**Develop kubeIP locally**
 
 Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
 
@@ -127,16 +128,19 @@ Install go/dep (Go dependency management tool) using [these instructions](https:
 dep ensure
 ```
 
-Compile the kubeIP by running: 
+You can now compile the kubeip binary and run tests
 
 ```
-make builder-image
+make
 ```
 
-Build the Docker image with compiled version of kubeIP as following:
+**Build kubeIP's container image**
+
+
+Compile the kubeIP binary and build the Docker image as following:
 
 ```
-make binary-image
+make image
 ```
 
 Tag the image using: 
