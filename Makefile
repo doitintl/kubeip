@@ -7,16 +7,13 @@ GOCMD = go
 GOFLAGS ?= $(GOFLAGS:)
 LDFLAGS =
 
-BUILD_DATE=`date +%Y-%m-%d\-%H:%M`
-VERSION=`git log | head -n 1 | cut  -f 2 -d ' '`
-
 default: build test
 
 build:
 	"$(GOCMD)" build ${GOFLAGS} ${LDFLAGS} -o "${BINARY}"
 
 image:
-	@docker build -t "${BINARY}" --build-arg VERSION=${VERSION} --build-arg BUILD_DATE=${BUILD_DATE} -f Dockerfile .
+	@docker build -t "${BINARY}" -f Dockerfile .
 
 test:
 	"$(GOCMD)" test -race -v $(shell go list ./... | grep -v '/vendor/')
