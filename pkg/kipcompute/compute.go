@@ -22,11 +22,10 @@ package kipcompute
 
 import (
 	"errors"
-	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	"github.com/Sirupsen/logrus"
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
@@ -67,51 +66,11 @@ func ListClusterZones(projectID string, clusterName string) ([]string, error) {
 }
 
 func ClusterName() (string, error) {
-	req, err := http.NewRequest("GET", "http://metadata/computeMetadata/v1/instance/attributes/cluster-name", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Add("Metadata-Flavor", "Google")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", errors.New("discover-gce: invalid status code 0 when fetching project id")
-	}
-
-	cluster, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(cluster), nil
+	return metadata.InstanceAttributeValue("cluster-name")
 }
 
 func ProjectName() (string, error) {
-	req, err := http.NewRequest("GET", "http://metadata.google.internal/computeMetadata/v1/project/project-id", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Add("Metadata-Flavor", "Google")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", errors.New("discover-gce: invalid status code when fetching project id")
-	}
-
-	project, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(project), nil
+	return metadata.ProjectID()
 }
 
 func FindFreeAddress(projectID string, region string, config *cfg.Config) (string, error) {
