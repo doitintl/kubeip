@@ -18,6 +18,7 @@ Set the environment variables:
 export GCP_REGION=us-central1
 export GKE_CLUSTER_NAME=kubeip-cluster
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
+export KUBEIP_SELF_NODEPOOL=pool-kubip
 ```
 
 **Create IAM Service Account and obtain the Key in JSON format**
@@ -86,7 +87,14 @@ Make sure the `deploy/kubeip-configmap.yaml` file contains correct values:
  - The `KUBEIP_LABELVALUE` should be your GKE cluster name
  - The `KUBEIP_NODEPOOL` should match the name of your GKE node-pool on which kubeIP will operate
  - The `KUBEIP_FORCEASSIGNMENT` - controls whether kubeIP should assign static IPs to existing nodes in the node-pool and defaults to true
+ - The `KUBEIP_SELF_NODEPOOL` - controls on which pool the kubeip pods should be running
 
+We recommend that KUBEIP_NODEPOOL shoudll not be the same as KUBEIP_SELF_NODEPOOL
+<pre>
+
+
+sed -i "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
+</pre>
 Deploy kubeIP by running: 
 
 ```
