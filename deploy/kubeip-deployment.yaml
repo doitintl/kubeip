@@ -18,6 +18,8 @@ spec:
           app: kubeip
       spec:
         priorityClassName: system-cluster-critical
+        nodeSelector:
+          cloud.google.com/gke-nodepool: pool-kubip
         containers:
         - name: "kubeip"
           image: doitintl/kubeip:latest
@@ -46,10 +48,6 @@ spec:
               configMapKeyRef:
                 key: "KUBEIP_FORCEASSIGNMENT"
                 name: "kubeip-config"
-        nodeSelector:
-          cloud.google.com/gke-nodepool: pool-kubip
-
-
           - name: GOOGLE_APPLICATION_CREDENTIALS
             value: /var/secrets/google/key.json
         restartPolicy: Always
@@ -58,7 +56,6 @@ spec:
           - name: google-cloud-key
             secret:
               secretName: kubeip-key
-
 
 ---
 apiVersion: v1
