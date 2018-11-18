@@ -1,12 +1,12 @@
 #  We need to get RBAC permissions first with
 #  kubectl create clusterrolebinding cluster-admin-binding \
-#    --clusterrole cluster-admin --user <user email>
+#    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kubeip
-  namespace: default
+  namespace: kube-system
 spec:
   replicas: 1
   selector:
@@ -19,7 +19,7 @@ spec:
       spec:
         priorityClassName: system-cluster-critical
         nodeSelector:
-          cloud.google.com/gke-nodepool: pool-kubip
+          cloud.google.com/gke-nodepool: deafult-pool
         containers:
         - name: "kubeip"
           image: doitintl/kubeip:latest
@@ -62,12 +62,14 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kubeip-sa
+  namespace: kube-system
 
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: kubeip-sa
+  namespace: kube-system
 rules:
 - apiGroups: [""]
   resources: ["nodes"]
@@ -85,7 +87,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: kubeip-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: kubeip-sa

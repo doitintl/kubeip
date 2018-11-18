@@ -9,4 +9,4 @@ metadata:
   labels:
     app: kubeip
   name: kubeip-config
-  namespace: default
+  namespace: kube-system
