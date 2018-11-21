@@ -57,12 +57,12 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kubeip-key --from-file=key.json
+kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
 ```
 **We need to get RBAC permissions first with**
 ```
 kubectl create clusterrolebinding cluster-admin-binding \
-   --clusterrole cluster-admin --user <user email>
+   --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
 ```
 **Create static reserved IP addresses:** 
 
@@ -199,13 +199,13 @@ gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
 Create a Kubernetes secret by running:
 
 ```
-kubectl create secret generic kubeip-key --from-file=key.json
+kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
 ```
 
 **We need to get RBAC permissions first with**
 ```
 kubectl create clusterrolebinding cluster-admin-binding \
-   --clusterrole cluster-admin --user <user email>
+   --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
 ```
 
 **Create static reserved IP addresses:** 
