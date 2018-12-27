@@ -15,7 +15,8 @@ gcloud config set project {your project_id}
 Set the environment variables: 
  
  ```
-export GCP_REGION=us-central1-b
+export GCP_REGION=us-central1
+export GCP_ZONE=us-central1-b
 export GKE_CLUSTER_NAME=kubeip-cluster
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 export KUBEIP_SELF_NODEPOOL=pool-kubip
@@ -50,7 +51,7 @@ Get your GKE cluster credentaials with (replace *cluster_name* with your real GK
 
 <pre>
 gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
---region $GCP_REGION \
+--region $GCP_ZONE \
 --project $PROJECT_ID
 </pre> 
 
@@ -124,6 +125,7 @@ Replace **us-central1** with the region where your GKE cluster resides and **kub
 
 ```
 export GCP_REGION=us-central1
+export GCP_ZONE=us-central1-b
 export GKE_CLUSTER_NAME=kubeip-cluster
 export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 ```
@@ -192,7 +194,7 @@ Get your GKE cluster credentaials with (replace *cluster_name* with your real GK
 
 <pre>
 gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
---region $GCP_REGION \
+--region $GCP_ZONE \
 --project $PROJECT_ID
 </pre> 
 
