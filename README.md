@@ -135,13 +135,7 @@ export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
 
 **Develop kubeIP locally**
 
-Install go/dep (Go dependency management tool) using [these instructions](https://github.com/golang/dep) and then run
-
-```
-dep ensure
-```
-
-You can now compile the kubeip binary and run tests
+Compile the kubeip binary and run tests
 
 ```
 make
