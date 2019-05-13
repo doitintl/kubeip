@@ -5,6 +5,7 @@ data:
   KUBEIP_NODEPOOL: "default-pool"
   KUBEIP_FORCEASSIGNMENT: "true"
   KUBEIP_ADDITIONALNODEPOOLS: ""
+  KUBEIP_TICKER: "5"
 kind: ConfigMap
 metadata:
   labels:

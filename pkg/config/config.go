@@ -22,6 +22,7 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -32,6 +33,7 @@ type Config struct {
 	NodePool        string
 	ForceAssignment bool
 	AdditionalNodePools[] string
+	Ticker time.Duration
 }
 
 func setConfigDefaults() {
@@ -41,6 +43,7 @@ func setConfigDefaults() {
 	viper.SetDefault("ForceAssignment", true)
 	viper.SetDefault("ForceAssignment", true)
 	viper.SetDefault("AdditionalNodePools", "")
+	viper.SetDefault("Ticker", 5)
 }
 
 func NewConfig() (*Config, error) {
@@ -59,6 +62,7 @@ func NewConfig() (*Config, error) {
 		NodePool:        viper.GetString("nodepool"),
 		ForceAssignment: viper.GetBool("forceassignment"),
 		AdditionalNodePools: AdditionalNodePools,
+		Ticker:           viper.GetDuration("ticker"),
 	}
 	return &c, nil
 }

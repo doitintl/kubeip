@@ -108,7 +108,7 @@ func Start(config *cfg.Config) error {
 		return err
 	}
 	c.config = config
-	c.ticker = time.NewTicker(5 * time.Minute)
+	c.ticker = time.NewTicker(c.config.Ticker * time.Minute)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	//TODO Set size
