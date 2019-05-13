@@ -208,6 +208,17 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
+func (c *Controller) isNodePollMonitored(pool string) bool {
+	if strings.ToLower(pool) == strings.ToLower(c.config.NodePool) {
+		return true
+	}
+	for _, ns := range c.config.AdditionalNodePools{
+		if strings.ToLower(pool) == strings.ToLower(ns) {
+			return true
+		}
+	}
+	return false
+}
 func (c *Controller) processItem(newEvent Event) error {
 	obj, _, err := c.informer.GetIndexer().GetByKey(newEvent.key)
 	if err != nil {
@@ -234,9 +245,11 @@ func (c *Controller) processItem(newEvent Event) error {
 					logrus.Infof(err.Error())
 				}
 				labels := nodeMeta.Labels
-				if pool, ok := labels["cloud.google.com/gke-nodepool"]; ok {
+				var pool string
+				var ok bool
+				if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
 					logrus.Infof("Node pool found %s", pool)
-					if strings.ToLower(pool) != strings.ToLower(c.config.NodePool) {
+					if !c.isNodePollMonitored(pool) {
 						return nil
 					}
 				} else {
@@ -254,6 +267,7 @@ func (c *Controller) processItem(newEvent Event) error {
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				inst.Name = node
 				inst.ProjectID = c.projectID
+				inst.Pool = pool
 				c.instance <- inst
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing node %s of cluster %s in zone %s", node, c.clusterName, inst.Zone)
 				return nil
@@ -268,10 +282,12 @@ func (c *Controller) processAllNodes() {
 	kubeClient := utils.GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
 	nodelist, _ := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	var pool string
+	var ok bool
 	for _, node := range nodelist.Items {
 		labels := node.GetLabels()
-		if pool, ok := labels["cloud.google.com/gke-nodepool"]; ok {
-			if strings.ToLower(pool) != strings.ToLower(c.config.NodePool) {
+		if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
+			if !c.isNodePollMonitored(pool) {
 				continue
 			}
 		} else {
@@ -287,8 +303,9 @@ func (c *Controller) processAllNodes() {
 		}
 		inst.ProjectID = c.projectID
 		inst.Name = node.GetName()
+		inst.Pool = pool
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found un assigned node %s", inst.Name)
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found un assigned node %s in pool", inst.Name, inst.Pool)
 			c.instance <- inst
 		}
 

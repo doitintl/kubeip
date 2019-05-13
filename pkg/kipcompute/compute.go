@@ -73,7 +73,7 @@ func ProjectName() (string, error) {
 	return metadata.ProjectID()
 }
 
-func FindFreeAddress(projectID string, region string, config *cfg.Config) (string, error) {
+func FindFreeAddress(projectID string, region string, pool string, config *cfg.Config) (string, error) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
@@ -85,7 +85,12 @@ func FindFreeAddress(projectID string, region string, config *cfg.Config) (strin
 		logrus.Error(err)
 		return "", err
 	}
-	filter := "(labels." + config.LabelKey + "=" + config.LabelValue + ")"
+	var filter string
+	if strings.ToLower(pool) == strings.ToLower(config.NodePool) {
+		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND  (-labels." + config.LabelKey + "-node-pool:*)"
+	} else {
+		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" +pool + ")"
+	}
 	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "FindFreeAddress"}).Errorf("Failed to list IP addresses in region %s: %q", region, err)
@@ -99,14 +104,14 @@ func FindFreeAddress(projectID string, region string, config *cfg.Config) (strin
 
 }
 
-func replaceIP(projectID string, zone string, instance string, config *cfg.Config) error {
+func replaceIP(projectID string, zone string, instance string, pool string, config *cfg.Config) error {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
 		logrus.Fatalf("Could not get authenticated client: %v", err)
 	}
 	region := zone[:len(zone)-2]
-	addr, err := FindFreeAddress(projectID, region, config)
+	addr, err := FindFreeAddress(projectID, region, pool, config)
 	if err != nil {
 		logrus.Infof(err.Error())
 		return err
@@ -199,7 +204,7 @@ func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
-		replaceIP(inst.ProjectID, inst.Zone, inst.Name, config)
+		replaceIP(inst.ProjectID, inst.Zone, inst.Name, inst.Pool, config)
 	}
 }
 

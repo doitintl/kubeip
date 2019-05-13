@@ -20,13 +20,18 @@
 
 package config
 
-import "github.com/spf13/viper"
+import (
+	"strings"
+
+	"github.com/spf13/viper"
+)
 
 type Config struct {
 	LabelKey        string
 	LabelValue      string
 	NodePool        string
 	ForceAssignment bool
+	AdditionalNodePools[] string
 }
 
 func setConfigDefaults() {
@@ -34,17 +39,26 @@ func setConfigDefaults() {
 	viper.SetDefault("LabelValue", "reserved")
 	viper.SetDefault("NodePool", "default-pool")
 	viper.SetDefault("ForceAssignment", true)
+	viper.SetDefault("ForceAssignment", true)
+	viper.SetDefault("AdditionalNodePools", "")
 }
 
 func NewConfig() (*Config, error) {
+	var AdditionalNodePools[] string
 	viper.SetEnvPrefix("kubeip")
 	viper.AutomaticEnv()
 	setConfigDefaults()
+	AdditionalNodePoolsStr := viper.GetString("additionalnodepools")
+	if len(AdditionalNodePoolsStr) > 0 {
+		AdditionalNodePools = strings.Split(AdditionalNodePoolsStr, ",")
+	}
+
 	c := Config{
 		LabelKey:        viper.GetString("labelkey"),
 		LabelValue:      viper.GetString("labelvalue"),
 		NodePool:        viper.GetString("nodepool"),
 		ForceAssignment: viper.GetBool("forceassignment"),
+		AdditionalNodePools: AdditionalNodePools,
 	}
 	return &c, nil
 }

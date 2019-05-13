@@ -24,4 +24,5 @@ type Instance struct {
 	ProjectID string
 	Name      string
 	Zone      string
+	Pool      string
 }

@@ -95,6 +95,11 @@ Make sure the `deploy/kubeip-configmap.yaml` file contains correct values:
 
 We recommend that KUBEIP_NODEPOOL should *NOT* be the same as KUBEIP_SELF_NODEPOOL
 
+
+If you would like to assign addresses to other node pools then `KUBEIP_NODEPOOL` you can add this nodepools to `KUBEIP_ADDITIONALNODEPOOLS` as a comma seprated list.
+You should tag the adressess for this pools with the `KUBEIP_LABELKEY` value + `-node-pool` and assing the value of the node pool name.
+e.g  `kubeip-node-pool=my-node-pool`
+
 <pre>
 sed -i "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
 </pre>
