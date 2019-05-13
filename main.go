@@ -33,6 +33,7 @@ var build_date string
 
 func main() {
 	config, _ = cfg.NewConfig()
+	logrus.Info(config)
 	cluster, err := kipcompute.ClusterName()
 	if err != nil {
 		logrus.Fatal(err)
