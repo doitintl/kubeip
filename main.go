@@ -43,6 +43,7 @@ func main() {
 		logrus.Fatal(err)
 		panic(err)
 	}
+	logrus.Info(config.AdditionalNodePools)
 	logrus.WithFields(logrus.Fields{
 		"Cluster name": cluster,
 		"Project name": projectID,

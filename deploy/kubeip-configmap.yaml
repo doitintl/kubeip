@@ -4,6 +4,7 @@ data:
   KUBEIP_LABELVALUE: "reserved"
   KUBEIP_NODEPOOL: "default-pool"
   KUBEIP_FORCEASSIGNMENT: "true"
+  KUBEIP_ADDITIONALNODEPOOLS: ""
 kind: ConfigMap
 metadata:
   labels:

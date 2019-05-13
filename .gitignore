@@ -13,3 +13,5 @@ kubeip
 *.out
 .idea/*
 vendor/*
+/.gcpprj
+/key.json
