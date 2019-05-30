@@ -34,6 +34,7 @@ type Config struct {
 	ForceAssignment bool
 	AdditionalNodePools[] string
 	Ticker time.Duration
+	AllNodePools bool
 }
 
 func setConfigDefaults() {
@@ -44,6 +45,7 @@ func setConfigDefaults() {
 	viper.SetDefault("ForceAssignment", true)
 	viper.SetDefault("AdditionalNodePools", "")
 	viper.SetDefault("Ticker", 5)
+	viper.SetDefault("AllNodePools", false)
 }
 
 func NewConfig() (*Config, error) {
@@ -63,6 +65,7 @@ func NewConfig() (*Config, error) {
 		ForceAssignment: viper.GetBool("forceassignment"),
 		AdditionalNodePools: AdditionalNodePools,
 		Ticker:           viper.GetDuration("ticker"),
+		AllNodePools: viper.GetBool("allnodepools"),
 	}
 	return &c, nil
 }

@@ -6,6 +6,7 @@ data:
   KUBEIP_FORCEASSIGNMENT: "true"
   KUBEIP_ADDITIONALNODEPOOLS: ""
   KUBEIP_TICKER: "5"
+  KUBEIP_ALLNODEPOOLS: "false"
 kind: ConfigMap
 metadata:
   labels:

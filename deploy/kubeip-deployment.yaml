@@ -58,6 +58,12 @@ spec:
               configMapKeyRef:
                 key: "KUBEIP_TICKER"
                 name: "kubeip-config"
+          - name: "KUBEIP_ALLNODEPOOLS"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_ALLNODEPOOLS"
+                name: "kubeip-config"
+
 
 
           - name: GOOGLE_APPLICATION_CREDENTIALS
