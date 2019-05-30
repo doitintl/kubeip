@@ -209,6 +209,9 @@ func (c *Controller) processNextItem() bool {
 }
 
 func (c *Controller) isNodePollMonitored(pool string) bool {
+	if c.config.AllNodePools == true {
+		return true
+	}
 	if strings.ToLower(pool) == strings.ToLower(c.config.NodePool) {
 		return true
 	}
