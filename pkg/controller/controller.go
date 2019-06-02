@@ -208,7 +208,7 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
-func (c *Controller) isNodePollMonitored(pool string) bool {
+func (c *Controller) isNodePoolMonitored(pool string) bool {
 	if c.config.AllNodePools == true {
 		return true
 	}
@@ -252,7 +252,7 @@ func (c *Controller) processItem(newEvent Event) error {
 				var ok bool
 				if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
 					logrus.Infof("Node pool found %s", pool)
-					if !c.isNodePollMonitored(pool) {
+					if !c.isNodePoolMonitored(pool) {
 						return nil
 					}
 				} else {
@@ -290,7 +290,7 @@ func (c *Controller) processAllNodes() {
 	for _, node := range nodelist.Items {
 		labels := node.GetLabels()
 		if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
-			if !c.isNodePollMonitored(pool) {
+			if !c.isNodePoolMonitored(pool) {
 				continue
 			}
 		} else {

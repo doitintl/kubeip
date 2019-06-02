@@ -86,7 +86,7 @@ func FindFreeAddress(projectID string, region string, pool string, config *cfg.C
 		return "", err
 	}
 	var filter string
-	if strings.ToLower(pool) == strings.ToLower(config.NodePool) {
+	if config.AllNodePools || strings.ToLower(pool) == strings.ToLower(config.NodePool) {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND  (-labels." + config.LabelKey + "-node-pool:*)"
 	} else {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" +pool + ")"
