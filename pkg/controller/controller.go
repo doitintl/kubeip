@@ -308,7 +308,7 @@ func (c *Controller) processAllNodes() {
 		inst.Name = node.GetName()
 		inst.Pool = pool
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found un assigned node %s in pool", inst.Name, inst.Pool)
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found unassigned node %s in pool", inst.Name, inst.Pool)
 			c.instance <- inst
 		}
 
