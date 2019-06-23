@@ -11,5 +11,6 @@ includedPermissions:
 - container.clusters.get
 - container.clusters.list
 - resourcemanager.projects.get
+- compute.networks.useExternalIp
 - compute.subnetworks.useExternalIp
 - compute.addresses.use
