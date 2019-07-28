@@ -15,9 +15,6 @@ build:
 image:
 	@docker build -t "${BINARY}" -f Dockerfile .
 
-test:
-	"$(GOCMD)" test -race -v $(shell go list ./... | grep -v '/vendor/')
-
 stop:
 	@docker stop "${BINARY}" || true # Do not fail if container does not exist
 
