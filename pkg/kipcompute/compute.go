@@ -118,12 +118,13 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Found reserved address %s", addr)
 	computeService, err := compute.New(hc)
-	_, err = computeService.Instances.Get(projectID, zone, instance).Do()
+	inst, err := computeService.Instances.Get(projectID, zone, instance).Do()
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
 		return err
 	}
-	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, "external-nat", "nic0").Do()
+	accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
+	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
 	if err != nil {
 		logrus.Errorf("DeleteAccessConfig %q", err)
 		return err
