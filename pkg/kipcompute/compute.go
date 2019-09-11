@@ -89,7 +89,7 @@ func FindFreeAddress(projectID string, region string, pool string, config *cfg.C
 	if config.AllNodePools || strings.ToLower(pool) == strings.ToLower(config.NodePool) {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND  (-labels." + config.LabelKey + "-node-pool:*)"
 	} else {
-		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" +pool + ")"
+		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" + pool + ")"
 	}
 	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
 	if err != nil {
@@ -123,13 +123,15 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
 		return err
 	}
-	accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
-	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
-	if err != nil {
-		logrus.Errorf("DeleteAccessConfig %q", err)
-		return err
+	if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
+		accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
+		op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
+		if err != nil {
+			logrus.Errorf("DeleteAccessConfig %q", err)
+			return err
+		}
+		waitForComplition(projectID, zone, op)
 	}
-	waitForComplition(projectID, zone, op)
 	accessConfig := &compute.AccessConfig{
 		Name:  "External NAT",
 		Type:  "ONE_TO_ONE_NAT",
