@@ -1,12 +1,12 @@
 # What is KubeIP?
 
-Many applications need to be whitelisted by consumers based on source IP address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of addresses to GKE cluster. kubeIP tries to solve this problem by assigning GKE nodes external IP addresses from a predefined list by continually watching the Kubernetes API for new/removed nodes and applying changes accordingly.
+Many applications need to be whitelisted by users based on a Source IP Address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of IP addresses to the GKE cluster. Using kubeIP, this problem is solved by assigning GKE nodes external IP addresses from a predefined list. kubeIP monitors the Kubernetes API for new/removed nodes and applies the changes accordingly.
 
 # Deploy kubeIP (without building from source)
 
-If you just want to use KubeIP (instead of building it from source yourself), please follow instructions in this section. You need a Kubernetes 1.10 or newer cluster. You'll also need the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+If you just want to use kubeIP (instead of building it yourself from source), please follow the instructions in this section. You’ll need Kubernetes version 1.10 or newer. You'll also need the [Google Cloud SDK](https://cloud.google.com/sdk).
 
-Configure gcloud sdk by setting your default project:
+To configure your Google Cloud SDK, set default project as:
 
 ```
 gcloud config set project {your project_id}
@@ -14,7 +14,7 @@ gcloud config set project {your project_id}
 
 Set the environment variables: 
  
- ```
+```
 export GCP_REGION=<gcp-region>
 export GCP_ZONE=<gcp-zone>
 export GKE_CLUSTER_NAME=<cluster-name>
@@ -23,7 +23,7 @@ export KUBEIP_NODEPOOL=<nodepool-with-static-ips>
 export KUBEIP_SELF_NODEPOOL=<nodepool-for-kubeip-to-run-in>
 ```
 
-**Create IAM Service Account and obtain the Key in JSON format**
+**Creating an IAM Service Account and obtaining the Key in JSON format**
 
 Create Service Account with this command: 
 
@@ -46,7 +46,7 @@ gcloud iam service-accounts keys create key.json \
 --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
  
-**Create Kubernetes Secret**
+**Create Kubernetes Secret Objects**
 
 Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
 
@@ -68,7 +68,7 @@ kubectl create clusterrolebinding cluster-admin-binding \
 ```
 **Create static reserved IP addresses:** 
 
-Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
+Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
 
 ```
 for i in {1..10}; do gcloud compute addresses create kubeip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
@@ -110,11 +110,12 @@ Deploy kubeIP by running:
 kubectl apply -f deploy/.
 ```
 
-After assigning an IP address to a node kubeip will also crate a label for that node `kubip_assigned` with the value of the IP address (`.` are replaced with `_`) 
+Once you’ve assigned an IP address to a node kubeIP, a label will be created for that `kubip_assigned` with the value of the IP address (`.` are replaced with `_`) `172.31.255.255 ==> 172_31_255_255`
+
 
 # Deploy & Build From Source
 
-You need a Kubernetes 1.10 or newer cluster. You also need Docker and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the Google Cloud SDK (which also installs kubectl) [here](https://cloud.google.com/sdk).
+You need Kubernetes version 1.10 or newer. You also need Docker version and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the [Google Cloud SDK](https://cloud.google.com/sdk) (which also installs kubectl).
 
 
 **Clone Git Repository**
@@ -214,7 +215,7 @@ kubectl create clusterrolebinding cluster-admin-binding \
 
 **Create static reserved IP addresses:** 
 
-Create as many static IP addresses as at least the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
+Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (automatically or manually):
 
 ```
 for i in {1..10}; do gcloud compute addresses create kubeip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
