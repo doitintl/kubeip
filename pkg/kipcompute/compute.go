@@ -123,7 +123,7 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
 		return err
 	}
-	if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
+	if len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
 		accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
 		op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
 		if err != nil {
@@ -138,7 +138,7 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		NatIP: addr,
 		Kind:  "kipcompute#accessConfig",
 	}
-	op, err = computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
+	op, err := computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
 	if err != nil {
 		logrus.Errorf("AddAccessConfig %q", err)
 		return err
