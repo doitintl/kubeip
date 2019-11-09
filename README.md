@@ -109,9 +109,9 @@ Deploy kubeIP by running:
 kubectl apply -f deploy/.
 ```
 
-Once you’ve assigned an IP address to a node kubeIP, a label will be created for that node `kubip_assigned` with the value of the IP address (`.` are replaced with `_`):
+Once you’ve assigned an IP address to a node kubeIP, a label will be created for that node `kubip_assigned` with the value of the IP address (`.` are replaced with `-`):
 
- `172.31.255.255 ==> 172_31_255_255`
+ `172.31.255.255 ==> 172-31-255-255`
 
 
 # Deploy & Build From Source
