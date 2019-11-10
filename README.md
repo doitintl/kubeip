@@ -48,7 +48,7 @@ gcloud iam service-accounts keys create key.json \
  
 **Create Kubernetes Secret Objects**
 
-Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
+Get your GKE cluster credentaials with (replace `$GKE_CLUSTER_NAME` with your real GKE cluster name):
 
 <pre>
 gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
