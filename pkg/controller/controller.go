@@ -63,9 +63,7 @@ type Controller struct {
 type Event struct {
 	key          string
 	eventType    string
-	namespace    string
 	resourceType string
-	name         string
 }
 
 var serverStartTime time.Time
@@ -209,14 +207,14 @@ func (c *Controller) processNextItem() bool {
 }
 
 func (c *Controller) isNodePoolMonitored(pool string) bool {
-	if c.config.AllNodePools == true {
+	if c.config.AllNodePools  {
 		return true
 	}
-	if strings.ToLower(pool) == strings.ToLower(c.config.NodePool) {
+	if strings.EqualFold(pool, c.config.NodePool) {
 		return true
 	}
 	for _, ns := range c.config.AdditionalNodePools{
-		if strings.ToLower(pool) == strings.ToLower(ns) {
+		if strings.EqualFold(pool, ns) {
 			return true
 		}
 	}
@@ -276,7 +274,6 @@ func (c *Controller) processItem(newEvent Event) error {
 				return nil
 			}
 		}
-
 	}
 	return nil
 }
@@ -313,7 +310,6 @@ func (c *Controller) processAllNodes() {
 		}
 
 	}
-
 }
 
 func (c *Controller) forceAssignment() {
@@ -322,7 +318,7 @@ func (c *Controller) forceAssignment() {
 		c.processAllNodes()
 	}
 	c.assignMissingTags()
-	for _ = range c.ticker.C {
+	for  range c.ticker.C {
 		if c.config.ForceAssignment {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("On Ticker")
 			c.processAllNodes()
@@ -356,5 +352,5 @@ func (c *Controller) assignMissingTags() {
 			continue
 		}
 	}
-
 }
+

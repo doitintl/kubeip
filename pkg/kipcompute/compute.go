@@ -86,7 +86,7 @@ func FindFreeAddress(projectID string, region string, pool string, config *cfg.C
 		return "", err
 	}
 	var filter string
-	if config.AllNodePools || strings.ToLower(pool) == strings.ToLower(config.NodePool) {
+	if config.AllNodePools || strings.EqualFold(pool, config.NodePool) {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND  (-labels." + config.LabelKey + "-node-pool:*)"
 	} else {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" +pool + ")"
@@ -118,6 +118,10 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Found reserved address %s", addr)
 	computeService, err := compute.New(hc)
+	if err != nil {
+		logrus.Infof(err.Error())
+		return err
+	}
 	inst, err := computeService.Instances.Get(projectID, zone, instance).Do()
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
@@ -129,7 +133,10 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		logrus.Errorf("DeleteAccessConfig %q", err)
 		return err
 	}
-	waitForComplition(projectID, zone, op)
+	err = waitForComplition(projectID, zone, op)
+	if err != nil {
+		return err
+	}
 	accessConfig := &compute.AccessConfig{
 		Name:  "External NAT",
 		Type:  "ONE_TO_ONE_NAT",
@@ -141,7 +148,10 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		logrus.Errorf("AddAccessConfig %q", err)
 		return err
 	}
-	waitForComplition(projectID, zone, op)
+	err = waitForComplition(projectID, zone, op)
+	if err != nil {
+		return err
+	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr)
 	oldNode, err := utils.GetNodeByIP(addr)
 	if err == nil {
@@ -157,8 +167,13 @@ func waitForComplition(projectID string, zone string, operation *compute.Operati
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)
 	if err != nil {
 		logrus.Fatalf("Could not get authenticated client: %v", err)
+		return err
 	}
 	computeService, err := compute.New(hc)
+	if err != nil {
+		logrus.Fatalf("Could not get create compute service: %v", err)
+		return err
+	}
 	for {
 		op, err := computeService.ZoneOperations.Get(projectID, zone, operation.Name).Do()
 		if err != nil {
@@ -205,7 +220,7 @@ func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
-		replaceIP(inst.ProjectID, inst.Zone, inst.Name, inst.Pool, config)
+		_ = replaceIP(inst.ProjectID, inst.Zone, inst.Name, inst.Pool, config)
 	}
 }
 
@@ -244,6 +259,9 @@ func AddTagIfMissing(projectID string, instance string, zone string) {
 		return
 	}
 	computeService, err := compute.New(hc)
+	if err != nil {
+		return
+	}
 	inst, err := computeService.Instances.Get(projectID, zone, instance).Do()
 	if err != nil {
 		return
@@ -260,3 +278,5 @@ func AddTagIfMissing(projectID string, instance string, zone string) {
 	}
 
 }
+
+

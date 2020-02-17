@@ -29,7 +29,7 @@ import (
 
 var config *cfg.Config
 var version string
-var build_date string
+var buildDate string
 
 func main() {
 	config, _ = cfg.NewConfig()
@@ -49,7 +49,7 @@ func main() {
 		"Cluster name": cluster,
 		"Project name": projectID,
 		"Version":      version,
-		"Build Date":   build_date,
+		"Build Date":   buildDate,
 	}).Info("kubeIP is starting")
 	err = c.Run(config)
 	if err != nil {

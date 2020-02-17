@@ -13,7 +13,7 @@ RUN go mod download
 FROM build_base AS builder
 COPY . .
 
-RUN cd /go/src/github.com/doitintl/kubeip && GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$(git log | head -n 1 | cut  -f 2 -d ' ') -X main.build_date=$(date +%Y-%m-%d\-%H:%M)" -o /kubeip
+RUN cd /go/src/github.com/doitintl/kubeip && GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$(git log | head -n 1 | cut  -f 2 -d ' ') -X main.buildDate=$(date +%Y-%m-%d\-%H:%M)" -o /kubeip
 
 FROM alpine
 RUN apk add --no-cache ca-certificates

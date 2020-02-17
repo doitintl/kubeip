@@ -93,7 +93,6 @@ func TagNode(node string, ip string) {
 	if err != nil {
 		logrus.Error(err)
 	}
-
 }
 
 func GetNodeByIP(ip string) (string, error) {
