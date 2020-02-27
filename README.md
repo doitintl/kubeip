@@ -12,7 +12,7 @@ To configure your Google Cloud SDK, set default project as:
 gcloud config set project {your project_id}
 ```
 
-Set the environment variables: 
+Set the environment variables and make sure to configure before continuing: 
  
 ```
 export GCP_REGION=<gcp-region>
@@ -238,7 +238,7 @@ Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image 
 
  - Edit the `image` to match your container image path, i.e. `gcr.io/$PROJECT_ID/kubeip`
 
-By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another nood-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes. 
+By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another node-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes. 
 
 The `KUBEIP_FORCEASSIGNMENT` (which defaults to true) will check on startup and every five minutes if there are nodes in the node-pool that are not assigned to a reserved address. If such nodes are found, then kubeIP will assign a reserved address (if one is available to them):
 
