@@ -225,7 +225,7 @@ func (c *Controller) processItem(newEvent Event) error {
 	if err != nil {
 		return fmt.Errorf("error fetching object with key %s from store: %v", newEvent.key, err)
 	}
-	// get object's metedata
+	// get object's metadata
 	objectMeta := utils.GetObjectMetaData(obj)
 
 	// process events based on its type
@@ -305,7 +305,7 @@ func (c *Controller) processAllNodes() {
 		inst.Name = node.GetName()
 		inst.Pool = pool
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found unassigned node %s in pool", inst.Name, inst.Pool)
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found unassigned node %s in pool %s", inst.Name, inst.Pool)
 			c.instance <- inst
 		}
 
