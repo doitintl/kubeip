@@ -60,7 +60,7 @@ func findFreeAddress(projectID string, region string, pool string, config *cfg.C
 	if config.AllNodePools || strings.EqualFold(pool, config.NodePool) {
 		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND  (-labels." + config.LabelKey + "-node-pool:*)"
 	} else {
-		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" +pool + ")"
+		filter = "(labels." + config.LabelKey + "=" + config.LabelValue + ")" + " AND " + "(labels." + config.LabelKey + "-node-pool=" + pool + ")"
 	}
 	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=RESERVED) AND " + filter).Do()
 	if err != nil {
@@ -98,15 +98,17 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Errorf("Instance not found %s zone %s: %q", instance, zone, err)
 		return err
 	}
-	accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
-	op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
-	if err != nil {
-		logrus.Errorf("DeleteAccessConfig %q", err)
-		return err
-	}
-	err = waitForCompilation(projectID, zone, op)
-	if err != nil {
-		return err
+	if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
+		accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
+		op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
+		if err != nil {
+			logrus.Errorf("DeleteAccessConfig %q", err)
+			return err
+		}
+		err = waitForCompilation(projectID, zone, op)
+		if err != nil {
+			return err
+		}
 	}
 	accessConfig := &compute.AccessConfig{
 		Name:  "External NAT",
@@ -114,7 +116,7 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 		NatIP: addr,
 		Kind:  "kipcompute#accessConfig",
 	}
-	op, err = computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
+	op, err := computeService.Instances.AddAccessConfig(projectID, zone, instance, "nic0", accessConfig).Do()
 	if err != nil {
 		logrus.Errorf("AddAccessConfig %q", err)
 		return err
@@ -249,5 +251,3 @@ func AddTagIfMissing(projectID string, instance string, zone string) {
 	}
 
 }
-
-
