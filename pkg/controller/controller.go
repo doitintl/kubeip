@@ -207,13 +207,13 @@ func (c *Controller) processNextItem() bool {
 }
 
 func (c *Controller) isNodePoolMonitored(pool string) bool {
-	if c.config.AllNodePools  {
+	if c.config.AllNodePools {
 		return true
 	}
 	if strings.EqualFold(pool, c.config.NodePool) {
 		return true
 	}
-	for _, ns := range c.config.AdditionalNodePools{
+	for _, ns := range c.config.AdditionalNodePools {
 		if strings.EqualFold(pool, ns) {
 			return true
 		}
@@ -318,9 +318,9 @@ func (c *Controller) forceAssignment() {
 		c.processAllNodes()
 	}
 	c.assignMissingTags()
-	for  range c.ticker.C {
+	for range c.ticker.C {
 		if c.config.ForceAssignment {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("On Ticker")
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("On Ticker")
 			c.processAllNodes()
 		}
 		c.assignMissingTags()
@@ -328,29 +328,33 @@ func (c *Controller) forceAssignment() {
 }
 
 func (c *Controller) assignMissingTags() {
-	kubeClient := utils.GetClient()
-	label := fmt.Sprintf("!kubip_assigned,cloud.google.com/gke-nodepool=%s", c.config.NodePool)
-	nodelist, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
-		LabelSelector: label,
-	})
-	if err != nil {
-		logrus.Error(err)
-		return
+	nodePools := append(c.config.AdditionalNodePools, c.config.NodePool)
 
-	}
-	for _, node := range nodelist.Items {
-		labels := node.GetLabels()
-		if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
-			if err != nil {
-				logrus.Fatalf("Could not get authenticated client: %v", err)
+	kubeClient := utils.GetClient()
+
+	for _, pool := range nodePools {
+		label := fmt.Sprintf("!kubip_assigned,cloud.google.com/gke-nodepool=%s", pool)
+		nodelist, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
+			LabelSelector: label,
+		})
+		if err != nil {
+			logrus.Error(err)
+			continue
+
+		}
+		for _, node := range nodelist.Items {
+			labels := node.GetLabels()
+			if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
+				if err != nil {
+					logrus.Fatalf("Could not get authenticated client: %v", err)
+					continue
+				}
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
+				kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone)
+
+			} else {
 				continue
 			}
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
-			kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone)
-
-		} else {
-			continue
 		}
 	}
 }
-
