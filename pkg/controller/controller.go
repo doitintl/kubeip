@@ -72,6 +72,7 @@ const maxRetries = 5
 
 const prefix = "kube-system/kube-proxy-"
 
+// Start kubeip controller
 func Start(config *cfg.Config) error {
 	var kubeClient kubernetes.Interface
 	_, err := rest.InClusterConfig()

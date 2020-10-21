@@ -27,14 +27,15 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config kubeip configuration
 type Config struct {
-	LabelKey        string
-	LabelValue      string
-	NodePool        string
-	ForceAssignment bool
-	AdditionalNodePools[] string
-	Ticker time.Duration
-	AllNodePools bool
+	LabelKey            string
+	LabelValue          string
+	NodePool            string
+	ForceAssignment     bool
+	AdditionalNodePools []string
+	Ticker              time.Duration
+	AllNodePools        bool
 }
 
 func setConfigDefaults() {
@@ -48,8 +49,9 @@ func setConfigDefaults() {
 	viper.SetDefault("AllNodePools", false)
 }
 
+// NewConfig initialize kubeip configuration
 func NewConfig() (*Config, error) {
-	var AdditionalNodePools[] string
+	var AdditionalNodePools []string
 	viper.SetEnvPrefix("kubeip")
 	viper.AutomaticEnv()
 	setConfigDefaults()
@@ -59,13 +61,13 @@ func NewConfig() (*Config, error) {
 	}
 
 	c := Config{
-		LabelKey:        viper.GetString("labelkey"),
-		LabelValue:      viper.GetString("labelvalue"),
-		NodePool:        viper.GetString("nodepool"),
-		ForceAssignment: viper.GetBool("forceassignment"),
+		LabelKey:            viper.GetString("labelkey"),
+		LabelValue:          viper.GetString("labelvalue"),
+		NodePool:            viper.GetString("nodepool"),
+		ForceAssignment:     viper.GetBool("forceassignment"),
 		AdditionalNodePools: AdditionalNodePools,
-		Ticker:           viper.GetDuration("ticker"),
-		AllNodePools: viper.GetBool("allnodepools"),
+		Ticker:              viper.GetDuration("ticker"),
+		AllNodePools:        viper.GetBool("allnodepools"),
 	}
 	return &c, nil
 }

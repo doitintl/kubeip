@@ -36,10 +36,12 @@ import (
 	"google.golang.org/api/container/v1"
 )
 
+// ClusterName get GKE cluster name from metadata
 func ClusterName() (string, error) {
 	return metadata.InstanceAttributeValue("cluster-name")
 }
 
+// ProjectName get GCP project name from metadata
 func ProjectName() (string, error) {
 	return metadata.ProjectID()
 }
@@ -161,6 +163,7 @@ func waitForCompilation(projectID string, zone string, operation *compute.Operat
 	}
 }
 
+// IsInstanceUsesReservedIP test if GKE node is using reserved IP
 func IsInstanceUsesReservedIP(projectID string, instance string, zone string, config *cfg.Config) bool {
 	region := zone[:len(zone)-2]
 	ctx := context.Background()
@@ -189,6 +192,7 @@ func IsInstanceUsesReservedIP(projectID string, instance string, zone string, co
 	return false
 }
 
+// Kubeip replace GKE node IP
 func Kubeip(instance <-chan types.Instance, config *cfg.Config) {
 	for {
 		inst := <-instance
@@ -224,6 +228,7 @@ func isAddressReserved(ip string, region string, projectID string) bool {
 
 }
 
+// AddTagIfMissing add GKE node tag if missing
 func AddTagIfMissing(projectID string, instance string, zone string) {
 	ctx := context.Background()
 	hc, err := google.DefaultClient(ctx, container.CloudPlatformScope)

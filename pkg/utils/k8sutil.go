@@ -83,11 +83,12 @@ func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
 	return objectMeta
 }
 
+// TagNode tag GKE node with "kubip_assigned" label (with typo)
 func TagNode(node string, ip string) {
 	kubeClient := GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip)
-	dashIp := strings.Replace(ip, ".", "-", 4)
-	labelString := "{" + "\"" + "kubip_assigned" + "\":\"" + dashIp + "\"" + "}"
+	dashIP := strings.Replace(ip, ".", "-", 4)
+	labelString := "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + "}"
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 	_, err := kubeClient.CoreV1().Nodes().Patch(node, types_v1.MergePatchType, []byte(patch))
 	if err != nil {
@@ -95,10 +96,11 @@ func TagNode(node string, ip string) {
 	}
 }
 
+//GetNodeByIP get GKE node by IP
 func GetNodeByIP(ip string) (string, error) {
 	kubeClient := GetClient()
-	dashIp := strings.Replace(ip, ".", "-", 4)
-	label := fmt.Sprintf("kubip_assigned=%v", dashIp)
+	dashIP := strings.Replace(ip, ".", "-", 4)
+	label := fmt.Sprintf("kubip_assigned=%v", dashIP)
 	l, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
 		LabelSelector: label,
 	})
@@ -107,7 +109,7 @@ func GetNodeByIP(ip string) (string, error) {
 		return "", err
 	}
 	if len(l.Items) == 0 {
-		return "", errors.New("Did not found matching node with IP")
+		return "", errors.New("did not found matching node with IP")
 	}
 	return l.Items[0].GetName(), nil
 
