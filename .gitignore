@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+.bin
 kubeip
 
 # Test binary, build with `go test -c`

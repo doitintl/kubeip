@@ -20,6 +20,7 @@
 
 package types
 
+// Instance GKE Instance VM
 type Instance struct {
 	ProjectID string
 	Name      string

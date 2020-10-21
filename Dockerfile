@@ -1,23 +1,37 @@
+# syntax = docker/dockerfile:experimental
 
-FROM golang:1.12-alpine AS build_base
-LABEL maintainer="Aviv Laufer <aviv.laufer@gmail.com>"
-RUN apk update && apk upgrade && \
-    apk add --no-cache git build-base ca-certificates
-
-WORKDIR /go/src/github.com/doitintl/kubeip
-ENV GO111MODULE=on
+#
+# ----- Go Builder Image ------
+#
+FROM golang:1.15-alpine AS builder
+# curl git bash
+RUN apk add --no-cache curl git bash make
+#
+# ----- build and test -----
+#
+FROM builder as build
+# set working directorydoc
+RUN mkdir -p /go/src/app
+WORKDIR /go/src/app
+# load dependency
 COPY go.mod .
 COPY go.sum .
-RUN go mod download
-
-FROM build_base AS builder
+RUN --mount=type=cache,target=/go/mod go mod download
+# copy sources
 COPY . .
+# build
+RUN make
 
-RUN cd /go/src/github.com/doitintl/kubeip && GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$(git log | head -n 1 | cut  -f 2 -d ' ') -X main.buildDate=$(date +%Y-%m-%d\-%H:%M)" -o /kubeip
+#
+# ------ release Docker image ------
+#
+FROM scratch
+# copy CA certificates
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# this is the last command since it's never cached
+COPY --from=build /go/src/app/.bin/github.com/doitintl/kubeip /kubeip
 
-FROM alpine
-RUN apk add --no-cache ca-certificates
+ENTRYPOINT ["/kubeip"]
 
-COPY --from=builder /kubeip /bin/kubeip
 
-ENTRYPOINT ["/bin/kubeip"]
+# RUN cd /go/src/github.com/doitintl/kubeip && GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$(git log | head -n 1 | cut  -f 2 -d ' ') -X main.buildDate=$(date +%Y-%m-%d\-%H:%M)" -o /kubeip
