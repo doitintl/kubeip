@@ -86,8 +86,7 @@ for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-l
 ```
 
 ```
-sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
-sed -i "s/default-pool/$KUBEIP_NODEPOOL/g" deploy/kubeip-configmap.yaml
+sed -i -e "s/reserved/$GKE_CLUSTER_NAME/g" -e "s/default-pool/$KUBEIP_NODEPOOL/g" deploy/kubeip-configmap.yaml
 ```
 
 Make sure the `deploy/kubeip-configmap.yaml` file contains the correct values:
