@@ -1,4 +1,4 @@
-// Copyright © 2018 Aviv Laufer <aviv.laufer@gmail.com>
+// Copyright © 2021 DoiT International
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -12,7 +12,7 @@
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFINGEMENT. IN NO EVENT SHALL THE
 // AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
@@ -25,13 +25,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Sirupsen/logrus"
-	apps_v1 "k8s.io/api/apps/v1"
-	batch_v1 "k8s.io/api/batch/v1"
-	api_v1 "k8s.io/api/core/v1"
-	ext_v1beta1 "k8s.io/api/extensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	types_v1 "k8s.io/apimachinery/pkg/types"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	apiv1 "k8s.io/api/core/v1"
+	extv1beta1 "k8s.io/api/extensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	typesv1 "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -52,32 +53,32 @@ func GetClient() kubernetes.Interface {
 }
 
 // GetObjectMetaData returns metadata of a given k8s object
-func GetObjectMetaData(obj interface{}) meta_v1.ObjectMeta {
+func GetObjectMetaData(obj interface{}) metav1.ObjectMeta {
 
-	var objectMeta meta_v1.ObjectMeta
+	var objectMeta metav1.ObjectMeta
 
 	switch object := obj.(type) {
-	case *apps_v1.Deployment:
+	case *appsv1.Deployment:
 		objectMeta = object.ObjectMeta
-	case *api_v1.ReplicationController:
+	case *apiv1.ReplicationController:
 		objectMeta = object.ObjectMeta
-	case *apps_v1.ReplicaSet:
+	case *appsv1.ReplicaSet:
 		objectMeta = object.ObjectMeta
-	case *apps_v1.DaemonSet:
+	case *appsv1.DaemonSet:
 		objectMeta = object.ObjectMeta
-	case *api_v1.Service:
+	case *apiv1.Service:
 		objectMeta = object.ObjectMeta
-	case *api_v1.Pod:
+	case *apiv1.Pod:
 		objectMeta = object.ObjectMeta
-	case *batch_v1.Job:
+	case *batchv1.Job:
 		objectMeta = object.ObjectMeta
-	case *api_v1.PersistentVolume:
+	case *apiv1.PersistentVolume:
 		objectMeta = object.ObjectMeta
-	case *api_v1.Namespace:
+	case *apiv1.Namespace:
 		objectMeta = object.ObjectMeta
-	case *api_v1.Secret:
+	case *apiv1.Secret:
 		objectMeta = object.ObjectMeta
-	case *ext_v1beta1.Ingress:
+	case *extv1beta1.Ingress:
 		objectMeta = object.ObjectMeta
 	}
 	return objectMeta
@@ -90,18 +91,18 @@ func TagNode(node string, ip string) {
 	dashIP := strings.Replace(ip, ".", "-", 4)
 	labelString := "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + "}"
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
-	_, err := kubeClient.CoreV1().Nodes().Patch(node, types_v1.MergePatchType, []byte(patch))
+	_, err := kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	if err != nil {
 		logrus.Error(err)
 	}
 }
 
-//GetNodeByIP get GKE node by IP
+// GetNodeByIP get GKE node by IP
 func GetNodeByIP(ip string) (string, error) {
 	kubeClient := GetClient()
 	dashIP := strings.Replace(ip, ".", "-", 4)
 	label := fmt.Sprintf("kubip_assigned=%v", dashIP)
-	l, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
+	l, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
 		LabelSelector: label,
 	})
 	if err != nil {

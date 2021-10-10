@@ -1,4 +1,4 @@
-// Copyright © 2018 Aviv Laufer <aviv.laufer@gmail.com>
+// Copyright © 2021 DoiT International
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -28,12 +28,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
-
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/kipcompute"
 	"github.com/doitintl/kubeip/pkg/types"
 	"github.com/doitintl/kubeip/pkg/utils"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,10 +84,10 @@ func Start(config *cfg.Config) error {
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).List(options)
+				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).List(context.Background(), options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).Watch(options)
+				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).Watch(context.Background(), options)
 			},
 		},
 		&api_v1.Pod{},
@@ -242,7 +242,7 @@ func (c *Controller) processItem(newEvent Event) error {
 				var options meta_v1.GetOptions
 				options.Kind = "Node"
 				options.APIVersion = "1"
-				nodeMeta, err := kubeClient.CoreV1().Nodes().Get(node, options)
+				nodeMeta, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, options)
 				if err != nil {
 					logrus.Infof(err.Error())
 				}
@@ -282,7 +282,7 @@ func (c *Controller) processItem(newEvent Event) error {
 func (c *Controller) processAllNodes() {
 	kubeClient := utils.GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
-	nodelist, _ := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{})
+	nodelist, _ := kubeClient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
 	var pool string
 	var ok bool
 	for _, node := range nodelist.Items {
@@ -335,7 +335,7 @@ func (c *Controller) assignMissingTags() {
 
 	for _, pool := range nodePools {
 		label := fmt.Sprintf("!kubip_assigned,cloud.google.com/gke-nodepool=%s", pool)
-		nodelist, err := kubeClient.CoreV1().Nodes().List(meta_v1.ListOptions{
+		nodelist, err := kubeClient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{
 			LabelSelector: label,
 		})
 		if err != nil {
