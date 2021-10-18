@@ -14,8 +14,8 @@ To configure your Google Cloud SDK, set default project as:
 gcloud config set project {your project_id}
 ```
 
-Set the environment variables and make sure to configure before continuing: 
- 
+Set the environment variables and make sure to configure before continuing:
+
 ```
 export GCP_REGION=<gcp-region>
 export GCP_ZONE=<gcp-zone>
@@ -27,7 +27,7 @@ export KUBEIP_SELF_NODEPOOL=<nodepool-for-kubeip-to-run-in>
 
 **Creating an IAM Service Account and obtaining the Key in JSON format**
 
-Create a Service Account with this command: 
+Create a Service Account with this command:
 
 ```
 gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
@@ -38,25 +38,28 @@ Create and attach a custom kubeIP role to the service account by running the fol
 ```
 gcloud iam roles create kubeip --project $PROJECT_ID --file roles.yaml
 
-gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role projects/$PROJECT_ID/roles/kubeip
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member=serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
+    --role=projects/$PROJECT_ID/roles/kubeip \
+    --condition=None
 ```
 
 Generate the Key using the following command:
 
 ```
 gcloud iam service-accounts keys create key.json \
---iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
+    --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
- 
+
 **Create Kubernetes Secret Objects**
 
 Get your GKE cluster credentaials with (replace `$GKE_CLUSTER_NAME` with your real GKE cluster name):
 
-<pre>
+```
 gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
---region $GCP_ZONE \
---project $PROJECT_ID
-</pre> 
+    --region $GCP_ZONE \
+    --project $PROJECT_ID
+```
 
 Create a Kubernetes secret object by running:
 
@@ -66,9 +69,9 @@ kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
 Get RBAC permissions with:
 ```
 kubectl create clusterrolebinding cluster-admin-binding \
-   --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
+    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
 ```
-**Create Static, Reserved IP Addresses:** 
+**Create Static, Reserved IP Addresses:**
 
 Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
 
@@ -82,12 +85,9 @@ Add labels to reserved IP addresses. A common practice is to assign a unique val
 for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels kubeip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
 ```
 
-<pre>
-{
-  sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
-  sed -i "s/default-pool/$KUBEIP_NODEPOOL/g" deploy/kubeip-configmap.yaml
-}
-</pre>
+```
+sed -i -e "s/reserved/$GKE_CLUSTER_NAME/g" -e "s/default-pool/$KUBEIP_NODEPOOL/g" deploy/kubeip-configmap.yaml
+```
 
 Make sure the `deploy/kubeip-configmap.yaml` file contains the correct values:
 
@@ -101,11 +101,11 @@ We recommend that KUBEIP_NODEPOOL should *NOT* be the same as KUBEIP_SELF_NODEPO
 If you would like to assign addresses to other node pools, then `KUBEIP_NODEPOOL` can be added to this nodepool `KUBEIP_ADDITIONALNODEPOOLS` as a comma separated list.
 You should tag the addresses for this pool with the `KUBEIP_LABELKEY` value + `-node-pool` and assign the value of the node pool a name i.e.,  `kubeip-node-pool=my-node-pool`
 
-<pre>
+```
 sed -i "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
-</pre>
+```
 
-Deploy kubeIP by running: 
+Deploy kubeIP by running:
 
 ```
 kubectl apply -f deploy/.
@@ -159,13 +159,13 @@ Compile the kubeIP binary and build the Docker image as following:
 make image
 ```
 
-Tag the image using: 
+Tag the image using:
 
 ```
 docker tag kubeip gcr.io/$PROJECT_ID/kubeip
 ```
 
-Finally, push the image to Google Container Registry with: 
+Finally, push the image to Google Container Registry with:
 
 ```
 docker push gcr.io/$PROJECT_ID/kubeip
@@ -173,7 +173,7 @@ docker push gcr.io/$PROJECT_ID/kubeip
 
 **Create IAM Service Account and obtain the Key in JSON format**
 
-Create a Service Account with this command: 
+Create a Service Account with this command:
 
 ```
 gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
@@ -191,18 +191,18 @@ Generate the Key using the following command:
 
 ```
 gcloud iam service-accounts keys create key.json \
---iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
+  --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
- 
+
 **Create Kubernetes Secret**
 
 Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
 
-<pre>
+```
 gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
---region $GCP_ZONE \
---project $PROJECT_ID
-</pre> 
+    --region $GCP_ZONE \
+    --project $PROJECT_ID
+```
 
 Create a Kubernetes secret by running:
 
@@ -213,10 +213,10 @@ kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
 **We need to get RBAC permissions first with**
 ```
 kubectl create clusterrolebinding cluster-admin-binding \
-   --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
+    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
 ```
 
-**Create static reserved IP addresses:** 
+**Create static reserved IP addresses:**
 
 Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (automatically or manually):
 
@@ -232,9 +232,9 @@ for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-l
 
 Adjust the deploy/kubeip-configmap.yaml with your GKE cluster name (replace the GKE-cluster-name with your real GKE cluster name):
 
-<pre>
+```
 sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
-</pre>
+```
 
 Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image path:
 
@@ -244,7 +244,7 @@ By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd
 
 The `KUBEIP_FORCEASSIGNMENT` (which defaults to true) will check on startup and every five minutes if there are nodes in the node-pool that are not assigned to a reserved address. If such nodes are found, then kubeIP will assign a reserved address (if one is available to them):
 
-Deploy kubeIP by running 
+Deploy kubeIP by running
 
 ```
 kubectl apply -f deploy/.
