@@ -9,6 +9,7 @@ TESTPKGS = $(shell env GO111MODULE=on $(GO) list -f \
 			'{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' \
 			$(PKGS))
 BIN      = $(CURDIR)/.bin
+BINARY = kubeip
 
 GO      = go
 TIMEOUT = 15
@@ -20,12 +21,29 @@ export GO111MODULE=on
 export CGO_ENABLED=0
 export GOPROXY=https://proxy.golang.org
 
+
 .PHONY: all
-all: fmt lint | $(BIN) ; $(info $(M) building executable...) @ ## Build program binary
+all: fmt lint binary
+
+.PHONY: binary
+binary: $(BIN) ; $(info $(M) building executable...) @ ## Build program binary
 	$Q $(GO) build \
 		-tags release \
 		-ldflags '-X main.version=$(VERSION) -X main.buildDate=$(DATE)' \
 		-o $(BIN)/$(basename $(MODULE)) main.go
+
+.PHONY: image
+image: clean-image
+	@docker build -t "${BINARY}" -f Dockerfile .
+
+.PHONY: stop
+stop:
+	@docker stop "${BINARY}" || true # Do not fail if container does not exist
+
+.PHONY: clean-image
+clean-image: stop
+	@docker rmi "${BINARY}" || true # Do not fail if image does not exist
+
 
 # Tools
 

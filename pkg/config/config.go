@@ -36,6 +36,11 @@ type Config struct {
 	AdditionalNodePools []string
 	Ticker              time.Duration
 	AllNodePools        bool
+	OrderByLabelKey     string
+	OrderByDesc         bool
+	CopyLabels          bool
+	ClearLabels         bool
+	DryRun              bool
 }
 
 func setConfigDefaults() {
@@ -47,6 +52,11 @@ func setConfigDefaults() {
 	viper.SetDefault("AdditionalNodePools", "")
 	viper.SetDefault("Ticker", 5)
 	viper.SetDefault("AllNodePools", false)
+	viper.SetDefault("OrderByLabelKey", "priority")
+	viper.SetDefault("OrderByDesc", true)
+	viper.SetDefault("CopyLabels", true)
+	viper.SetDefault("ClearLabels", true)
+	viper.SetDefault("DryRun", false)
 }
 
 // NewConfig initialize kubeip configuration
@@ -68,6 +78,11 @@ func NewConfig() (*Config, error) {
 		AdditionalNodePools: AdditionalNodePools,
 		Ticker:              viper.GetDuration("ticker"),
 		AllNodePools:        viper.GetBool("allnodepools"),
+		OrderByLabelKey:     viper.GetString("orderbylabelkey"),
+		OrderByDesc:         viper.GetBool("orderbydesc"),
+		CopyLabels:          viper.GetBool("copylabels"),
+		ClearLabels:         viper.GetBool("clearlabels"),
+		DryRun:              viper.GetBool("dryrun"),
 	}
 	return &c, nil
 }

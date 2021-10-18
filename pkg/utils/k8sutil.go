@@ -21,9 +21,13 @@
 package utils
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
+
+	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/types"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -36,6 +40,24 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+// Min helper method to determine the minimum between two numbers
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// Contains helper method to determine if a string is contained in an array
+func Contains(s []string, e string) bool {
+	for _, a := range s {
+		if strings.EqualFold(a, e) {
+			return true
+		}
+	}
+	return false
+}
 
 // GetClient returns a k8s clientset to the request from inside of cluster
 func GetClient() kubernetes.Interface {
@@ -84,17 +106,74 @@ func GetObjectMetaData(obj interface{}) metav1.ObjectMeta {
 	return objectMeta
 }
 
-// TagNode tag GKE node with "kubip_assigned" label (with typo)
-func TagNode(node string, ip string) {
-	kubeClient := GetClient()
-	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip)
-	dashIP := strings.Replace(ip, ".", "-", 4)
-	labelString := "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + "}"
-	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
-	_, err := kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
-	if err != nil {
-		logrus.Error(err)
+func clearLabels(m map[string]string, config *cfg.Config) string {
+	stringBuffer := new(bytes.Buffer)
+	for key := range m {
+		if !strings.EqualFold(key, config.OrderByLabelKey) &&
+			!strings.EqualFold(key, config.LabelKey) &&
+			!strings.Contains(key, "kubip_assigned") &&
+			!strings.Contains(key, "kubernetes") &&
+			!strings.Contains(key, "google") &&
+			!strings.Contains(key, "gke") {
+			fmt.Fprintf(stringBuffer, " ,\"%s\":null", key)
+		}
 	}
+	return stringBuffer.String()
+}
+
+func createLabelKeyValuePairs(m map[string]string, config *cfg.Config) string {
+	stringBuffer := new(bytes.Buffer)
+	for key, value := range m {
+		if !strings.EqualFold(key, config.OrderByLabelKey) &&
+			!strings.EqualFold(key, config.LabelKey) &&
+			!strings.Contains(key, "kubip_assigned") &&
+			!strings.Contains(key, "kubernetes") &&
+			!strings.Contains(key, "google") &&
+			!strings.Contains(key, "gke") {
+			fmt.Fprintf(stringBuffer, " ,\"%s\":\"%s\"", key, value)
+		}
+	}
+	return stringBuffer.String()
+}
+
+// TagNode tag GKE node with "kubip_assigned" label (with typo) and also copy the labels present on the address if the copyLabels flag is set to true
+func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
+	kubeClient := GetClient()
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip.IP)
+	dashIP := strings.Replace(ip.IP, ".", "-", 4)
+	var labelString string
+
+	if config.CopyLabels {
+		var labelsToClear string
+		if config.ClearLabels {
+			result, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, metav1.GetOptions{})
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Could not create clear label tag for node %s with ip %s and clear tags %s  ", node, ip.IP, result.Labels)
+				logrus.Error(err)
+			}
+			createLabelKeyValuePairs(result.Labels, config)
+			labelsToClear = clearLabels(result.Labels, config)
+		} else {
+			labelsToClear = ""
+		}
+
+		labelString = "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + labelsToClear + createLabelKeyValuePairs(ip.Labels, config) + "}"
+	} else {
+		labelString = "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + "}"
+	}
+	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
+
+	if config.DryRun {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+	} else {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+		_, err := kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		if err != nil {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Error occurred while tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+			logrus.Error(err)
+		}
+	}
+
 }
 
 // GetNodeByIP get GKE node by IP

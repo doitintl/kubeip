@@ -48,10 +48,35 @@ spec:
               configMapKeyRef:
                 key: "KUBEIP_FORCEASSIGNMENT"
                 name: "kubeip-config"
+          - name: "KUBEIP_ORDERBYLABELKEY"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_ORDERBYLABELKEY"
+                name: "kubeip-config"
+          - name: "KUBEIP_ORDERBYDESC"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_ORDERBYDESC"
+                name: "kubeip-config"
           - name: "KUBEIP_ADDITIONALNODEPOOLS"
             valueFrom:
               configMapKeyRef:
                 key: "KUBEIP_ADDITIONALNODEPOOLS"
+                name: "kubeip-config"
+          - name: "KUBEIP_COPYLABELS"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_COPYLABELS"
+                name: "kubeip-config"
+          - name: "KUBEIP_CLEARLABELS"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_CLEARLABELS"
+                name: "kubeip-config"
+          - name: "KUBEIP_DRYRUN"
+            valueFrom:
+              configMapKeyRef:
+                key: "KUBEIP_DRYRUN"
                 name: "kubeip-config"
           - name: "KUBEIP_TICKER"
             valueFrom:

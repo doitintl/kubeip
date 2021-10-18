@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -xe
 if [ -z "$REGION" ]; then
  echo REGION not defined!
  exit

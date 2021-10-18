@@ -1,4 +1,4 @@
-i![ci](https://github.com/doitintl/kubeip/workflows/ci/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip)
+![ci](https://github.com/doitintl/kubeip/workflows/ci/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip)
 
 # What is kubeIP?
 
@@ -115,6 +115,82 @@ Once you’ve assigned an IP address to a node kubeIP, a label will be created f
 
  `172.31.255.255 ==> 172-31-255-255`
 
+**Ordering IPs**
+
+KubeIP can order IPs based on the numeric value identified by `KUBEIP_ORDERBYLABELKEY`.  
+
+IPs are ordered in descending order if `KUBEIP_ORDERBYDESC` is set to true, ascending order otherwise. 
+
+Missing `KUBEIP_ORDERBYLABELKEY` or invalid values present on `KUBEIP_ORDERBYLABELKEY` will be assigned the lowest priority.  
+
+When nodes are added, deleted or on tick, kubeIP will check whether the nodes have the most optimal IP assignment.  What does this mean? 
+
+E.g. Let's assume Node1 has IP_A, Node2 has IP_B and IP_A > IP_B, when we scale the cluster down the cluster two things might happen  
+1. Node 1 is deleted which results in a sub-optimal IP assignment since Node2 has IP_B and IP_A > IP_B
+2. Node 2 is deleted maintaining optimal order.  
+
+In the first case Node 2 is re-assigned IP_A.  
+
+To order the IPs reserved above in asc order use 
+
+```
+for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels priority=$i --region=$GCP_REGION; done
+```
+
+and set 
+
+```
+KUBEIP_ORDERBYLABELKEY: "priority"
+KUBEIP_ORDERBYDESC: "false"
+```
+
+**Copy Labels**
+
+KubeIP will also copy all labels from the IP being assigned over to the node if `KUBEIP_COPYLABELS` is set to true.  
+
+This is typically helpful when we want to have node selection not based on IP but more semantic label keys and values.  
+
+As an example let's label `kubeip-ip1` with `platform_whitelisted=true`, to do this we execute the following command 
+
+```
+gcloud beta compute addresses update kubeip-ip1 --update-labels "platform_whitelisted=true" --region=$GCP_REGION;
+```
+
+Now, when a node is assigned the IP address of `kubeip-ip1` it will also be labelled with `platform_whitelisted=true` as well as the default `kubip_assigned`.  
+
+An IP can have multiple labels, all will be copied over.
+
+**Clear Labels**
+
+When IPs get assigned or re-assigned to achieve optimal IP assignment we can configure the system to clear any previous labels. Set `KUBEIP_CLEARLABELS` flag to `true` if you want this behaviour. 
+
+This feature is required when labels are not overlapping.  E.g. let's assume we have the following tagged IPs; IP_A and IP_B, order by priority
+
+```
+IP_A test_a=value_a,test_b=value_b,priority=1
+IP_B test_c=value_c,priority=2
+```
+Let's assume that the assignment was as follows 
+
+```
+IP_A => NodeA
+IP_B => NodeB
+```
+
+At this point `NodeA` has labels `test_a=value_a,test_b=value_b` and `NodeB` has labels `test_c=value_c`.  Note priority is not copied over.  
+
+If `NodeA` is deleted a re-assignment needs to happen (due to the fact that IP_A > IP_B) and `NodeB` would have
+- `test_a=value_a,test_b=value_b,test_c=value_c` if `KUBEIP_CLEARLABELS="false"` and 
+- `test_a=value_a,test_b=value_b` if `KUBEIP_CLEARLABELS="true"`
+
+Note that `test_c` is not an overlapping label and hence might cause problems if `KUBEIP_CLEARLABELS` is not set to `true`.  
+
+**Dry Run Mode**
+
+Dry run mode allows debugging the operations performed by KubeIP without actually performing the operations.  
+
+ONLY use this mode during development of new features on KubeIP.  
+
 
 # Deploy & Build From Source
 
@@ -170,6 +246,8 @@ Finally, push the image to Google Container Registry with:
 ```
 docker push gcr.io/$PROJECT_ID/kubeip
 ```
+
+Alternatively, you can export `REGISTRY` to `gcr.io/$PROJECT_ID` and run the script `build-all-and-push.sh` which builds and publishes the docker image.
 
 **Create IAM Service Account and obtain the Key in JSON format**
 

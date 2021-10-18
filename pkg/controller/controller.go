@@ -21,7 +21,9 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
+	"golang.org/x/time/rate"
 	"os"
 	"os/signal"
 	"strings"
@@ -46,6 +48,12 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+// AddressInstanceTuple object
+type AddressInstanceTuple struct {
+	address  string
+	instance types.Instance
+}
+
 // Controller object
 type Controller struct {
 	logger      *logrus.Entry
@@ -57,6 +65,7 @@ type Controller struct {
 	clusterName string
 	config      *cfg.Config
 	ticker      *time.Ticker
+	processing  bool
 }
 
 // Event indicate the informerEvent
@@ -91,7 +100,7 @@ func Start(config *cfg.Config) error {
 			},
 		},
 		&api_v1.Pod{},
-		0, //Skubeip resync
+		0, //Skip resync
 		cache.Indexers{},
 	)
 
@@ -125,7 +134,11 @@ func Start(config *cfg.Config) error {
 }
 
 func newResourceController(client kubernetes.Interface, informer cache.SharedIndexInformer, resourceType string) *Controller {
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	queue := workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 100*time.Second),
+		// 10 qps, 100 bucket size.  This is only for retry speed, and it's only the overall factor (not per item)
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	))
 	var newEvent Event
 	var err error
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -137,13 +150,22 @@ func newResourceController(client kubernetes.Interface, informer cache.SharedInd
 				queue.Add(newEvent)
 			}
 		},
+		DeleteFunc: func(obj interface{}) {
+			newEvent.key, err = cache.MetaNamespaceKeyFunc(obj)
+			newEvent.eventType = "delete"
+			newEvent.resourceType = resourceType
+			if err == nil {
+				queue.Add(newEvent)
+			}
+		},
 	})
 
 	return &Controller{
-		logger:    logrus.WithField("pkg", "kubeip-"+resourceType),
-		clientset: client,
-		informer:  informer,
-		queue:     queue,
+		logger:     logrus.WithField("pkg", "kubeip-"+resourceType),
+		clientset:  client,
+		informer:   informer,
+		queue:      queue,
+		processing: false,
 	}
 }
 
@@ -231,10 +253,17 @@ func (c *Controller) processItem(newEvent Event) error {
 
 	// process events based on its type
 	switch newEvent.eventType {
+	case "delete":
+		if strings.HasPrefix(newEvent.key, prefix) {
+			node := newEvent.key[len(prefix):]
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing removal to %v: %s ", newEvent.resourceType, node)
+			// A node has been deleted... we need to check whether the assignment is still optimal
+			c.forceAssignmentOnce(true)
+			return nil
+		}
 	case "create":
 		// compare CreationTimestamp and serverStartTime and alert only on latest events
 		// Could be Replaced by using Delta or DeltaFIFO
-
 		if objectMeta.CreationTimestamp.Sub(serverStartTime).Seconds() > 0 {
 			if strings.HasPrefix(newEvent.key, prefix) {
 				kubeClient := utils.GetClient()
@@ -246,6 +275,7 @@ func (c *Controller) processItem(newEvent Event) error {
 				if err != nil {
 					logrus.Infof(err.Error())
 				}
+
 				labels := nodeMeta.Labels
 				var pool string
 				var ok bool
@@ -255,8 +285,8 @@ func (c *Controller) processItem(newEvent Event) error {
 						return nil
 					}
 				} else {
-					logrus.Info("Did not found node pool")
-					return nil
+					logrus.Infof("Did not found node pool.  These are the labels present %s. ", labels)
+					return errors.New("Did not find node pool.  ")
 				}
 				var inst types.Instance
 				if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
@@ -264,7 +294,7 @@ func (c *Controller) processItem(newEvent Event) error {
 					inst.Zone = nodeZone
 				} else {
 					logrus.Info("Did not find zone")
-					return nil
+					return errors.New("Did not find zone.  ")
 				}
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				inst.Name = node
@@ -275,16 +305,29 @@ func (c *Controller) processItem(newEvent Event) error {
 				return nil
 			}
 		}
+
 	}
 	return nil
 }
 
-func (c *Controller) processAllNodes() {
+func isNodeReady(node api_v1.Node) bool {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == api_v1.NodeReady {
+			// If the node is unknown we assume that it is ready, we do not want to do IP changes so rapidly.
+			return condition.Status == api_v1.ConditionTrue || condition.Status == api_v1.ConditionUnknown
+		}
+	}
+	return false
+}
+
+func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 	kubeClient := utils.GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
 	nodelist, _ := kubeClient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
 	var pool string
 	var ok bool
+	var nodesOfInterest []types.Instance
+
 	for _, node := range nodelist.Items {
 		labels := node.GetLabels()
 		if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
@@ -302,29 +345,124 @@ func (c *Controller) processAllNodes() {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Did not find zone")
 			continue
 		}
+
 		inst.ProjectID = c.projectID
 		inst.Name = node.GetName()
 		inst.Pool = pool
+
+		// If node is not ready we will basically remove the node IP just in case
+		if !isNodeReady(node) {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Node %s in zone %s is not ready, removing IP so we can reuse it. ", inst.Name, inst.Zone)
+			// Delete the IP we will re-assign this
+			err := kipcompute.DeleteIP(c.projectID, inst.Zone, inst.Name, c.config)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
+					Errorf("Could not delete IP used by instance %s in zone %s. Aborting.", inst.Name, inst.Zone)
+				return
+			}
+			continue
+		}
+
+		nodesOfInterest = append(nodesOfInterest, inst)
+	}
+
+	// Should we check that the IPs assigned to the current nodes are in fact the best possible IPs to assign?
+	if shouldCheckOptimalIPAssignment {
+		// Determining the required IP per region
+		regionsCount := make(map[string][]types.Instance)
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Collected %d Nodes of interest...calculating number of IPs required", len(nodesOfInterest))
+		for _, inst := range nodesOfInterest {
+			zone := inst.Zone
+			region := zone[:len(zone)-2]
+			regionsCount[region] = append(regionsCount[region], inst)
+		}
+
+		// Determining the most optimal nodes per region.
+		for region, instances := range regionsCount {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Collected %d Nodes of interest...processing %d nodes instances within region %s", len(nodesOfInterest), len(instances), region)
+
+			addresses, err := kipcompute.GetAllAddresses(c.projectID, region, false, c.config)
+			if err != nil {
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Errorf("Could not retrieve addresses for project %s region %s. Aborting.", c.projectID, region)
+				return
+			}
+
+			var topMostAddresses []string
+			for _, address := range addresses.Items[:utils.Min(len(instances), len(addresses.Items))] {
+				topMostAddresses = append(topMostAddresses, address.Address)
+			}
+
+			// Retrieve all addresses in the region.
+			var usedAddresses []AddressInstanceTuple
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Retrieving addresses used in project %s in region %s", c.projectID, region)
+			for _, instance := range instances {
+				address, err := kipcompute.GetAddressUsedByInstance(c.projectID, instance.Name, instance.Zone, c.config)
+				if err != nil {
+					logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
+						Errorf("Could not retrieve address for project %s region %s instance %s. Aborting.", c.projectID, region, instance.Name)
+					return
+				}
+				usedAddresses = append(usedAddresses, AddressInstanceTuple{
+					address,
+					instance,
+				})
+			}
+
+			// Perform subtraction
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Project %s in region %s should use the following IPs %s... Checking that the instances follow these assignments", c.projectID, region, topMostAddresses)
+			var toRemove []AddressInstanceTuple
+			for _, usedAddress := range usedAddresses {
+				if !utils.Contains(topMostAddresses, usedAddress.address) {
+					toRemove = append(toRemove, usedAddress)
+				}
+			}
+
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found %d Addresses to remove project %s in region %s.  Addresses %s", len(toRemove), c.projectID, region, toRemove)
+			if len(toRemove) > 0 {
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found %d ips %s in region %s which are not part of the top most addresses %s", len(toRemove), toRemove, region, topMostAddresses)
+				for _, remove := range toRemove {
+
+					logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Instance %s in project %s in region %s uses suboptimal IP %s... Removing so we reassign", remove.instance.Name, c.projectID, region, toRemove)
+					// Delete the IP we will re-assign this
+					err := kipcompute.DeleteIP(c.projectID, remove.instance.Zone, remove.instance.Name, c.config)
+					if err != nil {
+						logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
+							Errorf("Could not delete IP %s used by instance %s which is suboptimal. Aborting.", remove.address, remove.instance.Name)
+						return
+					}
+				}
+			}
+		}
+	}
+
+	for _, inst := range nodesOfInterest {
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found unassigned node %s in pool %s", inst.Name, inst.Pool)
 			c.instance <- inst
 		}
+	}
+}
 
+func (c *Controller) forceAssignmentOnce(shouldCheckOptimalIPAssignment bool) {
+	if !c.processing {
+		c.processing = true
+		if c.config.ForceAssignment {
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignmentOnce"}).Info("Starting forceAssignmentOnce")
+			c.processAllNodes(shouldCheckOptimalIPAssignment)
+		}
+		c.assignMissingTags()
+		c.processing = false
+	} else {
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignmentOnce"}).Info("Skipping forceAssignmentOnce ... already in progress")
 	}
 }
 
 func (c *Controller) forceAssignment() {
-	if c.config.ForceAssignment {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Starting forceAssignment")
-		c.processAllNodes()
-	}
-	c.assignMissingTags()
+	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Processing initial force assignment check")
+	c.forceAssignmentOnce(true)
 	for range c.ticker.C {
-		if c.config.ForceAssignment {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("On Ticker")
-			c.processAllNodes()
-		}
-		c.assignMissingTags()
+		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "forceAssignment"}).Info("Tick received for force assignment check")
+		c.forceAssignmentOnce(false)
 	}
 }
 
@@ -351,7 +489,7 @@ func (c *Controller) assignMissingTags() {
 					continue
 				}
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
-				kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone)
+				kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone, c.config)
 
 			} else {
 				continue
