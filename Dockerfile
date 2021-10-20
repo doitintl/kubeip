@@ -16,11 +16,11 @@ WORKDIR /go/src/app
 # load dependency
 COPY go.mod .
 COPY go.sum .
-RUN --mount=type=cache,target=/go/mod go mod download
+RUN --mount=type=cache,target=$GOPATH/pkg/mod go mod download
 # copy sources
 COPY . .
 # build
-RUN make
+RUN make binary
 
 #
 # ------ release Docker image ------

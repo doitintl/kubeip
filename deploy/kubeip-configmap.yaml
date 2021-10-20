@@ -7,6 +7,11 @@ data:
   KUBEIP_ADDITIONALNODEPOOLS: ""
   KUBEIP_TICKER: "5"
   KUBEIP_ALLNODEPOOLS: "false"
+  KUBEIP_ORDERBYLABELKEY: "priority"
+  KUBEIP_ORDERBYDESC: "true"
+  KUBEIP_COPYLABELS: "false"
+  KUBEIP_CLEARLABELS: "false"
+  KUBEIP_DRYRUN: "false"
 kind: ConfigMap
 metadata:
   labels:
