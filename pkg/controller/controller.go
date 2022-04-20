@@ -412,7 +412,7 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Project %s in region %s should use the following IPs %s... Checking that the instances follow these assignments", c.projectID, region, topMostAddresses)
 			var toRemove []AddressInstanceTuple
 			for _, usedAddress := range usedAddresses {
-				if !utils.Contains(topMostAddresses, usedAddress.address) {
+				if usedAddress.address != "0.0.0.0" && !utils.Contains(topMostAddresses, usedAddress.address) {
 					toRemove = append(toRemove, usedAddress)
 				}
 			}
