@@ -102,7 +102,7 @@ If you would like to assign addresses to other node pools, then `KUBEIP_NODEPOOL
 You should tag the addresses for this pool with the `KUBEIP_LABELKEY` value + `-node-pool` and assign the value of the node pool a name i.e.,  `kubeip-node-pool=my-node-pool`
 
 ```
-sed -i "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
+sed -i -e "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
 ```
 
 Deploy kubeIP by running:
@@ -311,7 +311,7 @@ for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-l
 Adjust the deploy/kubeip-configmap.yaml with your GKE cluster name (replace the GKE-cluster-name with your real GKE cluster name):
 
 ```
-sed -i "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
+sed -i -e "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
 ```
 
 Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image path:
