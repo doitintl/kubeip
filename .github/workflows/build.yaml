@@ -21,7 +21,7 @@ jobs:
   docker-build:
 
     runs-on: ubuntu-20.04
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: ${{ !contains(github.event.head_commit.message,'[skip ci]') }}
 
     steps:
       - uses: actions/checkout@v3
