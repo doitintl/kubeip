@@ -64,10 +64,7 @@ jobs:
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-          FORMATTED_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-          echo "created=$FORMATTED_DATE" >> $GITHUB_OUTPUT
 
       - name: login to DockerHub
         uses: docker/login-action@v2
