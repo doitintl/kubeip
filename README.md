@@ -25,7 +25,26 @@ export KUBEIP_NODEPOOL=<nodepool-with-static-ips>
 export KUBEIP_SELF_NODEPOOL=<nodepool-for-kubeip-to-run-in>
 ```
 
-**Creating an IAM Service Account and obtaining the Key in JSON format**
+**Get credentials for yourself**
+
+If you haven't alrady, set up your GKE cluster credentials with
+(replace `$GKE_CLUSTER_NAME` with your real GKE cluster name):
+
+```
+gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
+    --region $GCP_ZONE \
+    --project $PROJECT_ID
+```
+
+You will need admin access to the cluster to deploy to the `kube-system` namespace.
+Either set the relevant IAM rolebinding for your user, or get RBAC permissions with:
+
+```
+kubectl create clusterrolebinding cluster-admin-binding \
+    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
+```
+
+**Creating an IAM Service Account**
 
 Create a Service Account with this command:
 
@@ -44,33 +63,24 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --condition=None
 ```
 
-Generate the Key using the following command:
+**Getting credentials to the deployment**
 
+Note: If you use Workload Identity in your cluster, you do not need to upload a credential file.
+You can just remove the GOOGLE_APPLICATION_CREDENTIALS environment variable from the manifest
+and the Google Cloud SDK will pick up the credentials from the metadata server as per normal
+operation.
+
+Generate the Key using the following command:
 ```
 gcloud iam service-accounts keys create key.json \
     --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
 ```
 
-**Create Kubernetes Secret Objects**
-
-Get your GKE cluster credentaials with (replace `$GKE_CLUSTER_NAME` with your real GKE cluster name):
-
-```
-gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
-    --region $GCP_ZONE \
-    --project $PROJECT_ID
-```
-
 Create a Kubernetes secret object by running:
-
 ```
 kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
 ```
-Get RBAC permissions with:
-```
-kubectl create clusterrolebinding cluster-admin-binding \
-    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
-```
+
 **Create Static, Reserved IP Addresses:**
 
 Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
