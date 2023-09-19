@@ -148,11 +148,12 @@ func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
 		if config.ClearLabels {
 			result, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, metav1.GetOptions{})
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Could not create clear label tag for node %s with ip %s and clear tags %s  ", node, ip.IP, result.Labels)
-				logrus.Error(err)
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Error(err)
+			} else {
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Clear label tag for node %s with ip %s and clear tags %s", node, ip.IP, result.Labels)
+				createLabelKeyValuePairs(result.Labels, config)
+				labelsToClear = clearLabels(result.Labels, config)
 			}
-			createLabelKeyValuePairs(result.Labels, config)
-			labelsToClear = clearLabels(result.Labels, config)
 		} else {
 			labelsToClear = ""
 		}
