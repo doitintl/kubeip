@@ -45,6 +45,8 @@ type Config struct {
 	OrderByDesc         bool
 	CopyLabels          bool
 	ClearLabels         bool
+	LogLevel            string
+	LogJSON             bool
 	DryRun              bool
 }
 
@@ -61,6 +63,8 @@ func setConfigDefaults() {
 	viper.SetDefault("OrderByDesc", true)
 	viper.SetDefault("CopyLabels", true)
 	viper.SetDefault("ClearLabels", true)
+	viper.SetDefault("LogLevel", "info")
+	viper.SetDefault("LogJSON", false)
 	viper.SetDefault("DryRun", false)
 }
 

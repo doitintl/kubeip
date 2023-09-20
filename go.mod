@@ -8,12 +8,12 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.16.0
 	golang.org/x/net v0.15.0
-	golang.org/x/oauth2 v0.12.0
 	golang.org/x/time v0.3.0
 	google.golang.org/api v0.142.0
 	k8s.io/api v0.28.2
 	k8s.io/apimachinery v0.28.2
 	k8s.io/client-go v0.28.2
+	sigs.k8s.io/controller-runtime v0.16.2
 )
 
 require (
@@ -53,6 +53,7 @@ require (
 	github.com/subosito/gotenv v1.4.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/oauth2 v0.12.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect

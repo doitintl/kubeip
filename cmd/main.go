@@ -1,22 +1,3 @@
-// Copyright © 2023 DoiT International
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
 package main
 
 import (
@@ -24,6 +5,7 @@ import (
 	"github.com/doitintl/kubeip/pkg/controller"
 	"github.com/doitintl/kubeip/pkg/kipcompute"
 	"github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
 var (
@@ -33,31 +15,64 @@ var (
 	gitBranch string
 )
 
-func main() {
+func prepareLogger(level string, json bool) *logrus.Entry {
 	logger := logrus.New()
+
+	// set debug log level
+	switch level {
+	case "debug", "DEBUG":
+		logger.SetLevel(logrus.DebugLevel)
+	case "info", "INFO":
+		logger.SetLevel(logrus.InfoLevel)
+	case "warning", "WARNING":
+		logger.SetLevel(logrus.WarnLevel)
+	case "error", "ERROR":
+		logger.SetLevel(logrus.ErrorLevel)
+	case "fatal", "FATAL":
+		logger.SetLevel(logrus.FatalLevel)
+	case "panic", "PANIC":
+		logger.SetLevel(logrus.PanicLevel)
+	default:
+		logger.SetLevel(logrus.WarnLevel)
+	}
+
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
+	if json {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
+
+	log := logger.WithFields(logrus.Fields{
+		"version": version,
+	})
+
+	return log
+}
+
+func main() {
+	ctx := signals.SetupSignalHandler()
 	cfg := config.NewConfig()
-	logger.Info(cfg)
+	logger := prepareLogger(cfg.LogLevel, cfg.LogJSON)
+	logger.WithField("config", cfg).Info("using kubeIP configuration")
 
 	cluster, err := kipcompute.ClusterName()
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to get cluster name")
+		logger.WithError(err).Fatal("failed to get cluster name")
 	}
 
 	project, err := kipcompute.ProjectName()
 	if err != nil {
-		logger.WithError(err).Fatal("Failed to get project name")
+		logger.WithError(err).Fatal("failed to get project name")
 	}
 
-	logger.WithFields(logrus.Fields{
-		"Cluster":    cluster,
-		"Project":    project,
-		"Version":    version,
-		"Build Date": buildDate,
-		"Git Commit": gitCommit,
-		"Git Branch": gitBranch,
-	}).Info("kubeIP is starting")
+	logger = logger.WithFields(logrus.Fields{
+		"cluster": cluster,
+		"project": project,
+	})
+	logger.Info("starting kubeIP controller")
 
-	if err = controller.Start(logger, project, cluster, cfg); err != nil {
-		logrus.WithError(err).Fatal("Failed to start kubeIP controller")
+	if err = controller.Start(ctx, logger, project, cluster, cfg); err != nil {
+		logrus.WithError(err).Fatal("failed to start kubeIP controller")
 	}
 }

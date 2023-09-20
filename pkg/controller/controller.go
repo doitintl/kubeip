@@ -139,12 +139,12 @@ func retrieveKubeConfig(log logrus.FieldLogger, cfg *config.Config) (*rest.Confi
 }
 
 // Start kubeip controller
-func Start(log logrus.FieldLogger, project, cluster string, cfg *config.Config) error {
-	restconfig, err := retrieveKubeConfig(log, cfg)
+func Start(ctx context.Context, log logrus.FieldLogger, project, cluster string, cfg *config.Config) error {
+	kubeConfig, err := retrieveKubeConfig(log, cfg)
 	if err != nil {
 		return errors.Wrap(err, "retrieving kube config")
 	}
-	kubeClient, err := kubernetes.NewForConfig(restconfig)
+	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
 		return errors.Wrap(err, "initializing kubernetes client")
 	}
