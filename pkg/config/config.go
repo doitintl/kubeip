@@ -1,4 +1,4 @@
-// Copyright © 2021 DoiT International
+// Copyright © 2023 DoiT International
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,8 +27,13 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultTicker = 5 * time.Minute
+)
+
 // Config kubeip configuration
 type Config struct {
+	KubeConfigPath      string
 	LabelKey            string
 	LabelValue          string
 	NodePool            string
@@ -44,13 +49,13 @@ type Config struct {
 }
 
 func setConfigDefaults() {
+	viper.SetDefault("KubeConfigPath", "")
 	viper.SetDefault("LabelKey", "kubeip")
 	viper.SetDefault("LabelValue", "reserved")
 	viper.SetDefault("NodePool", "default-pool")
 	viper.SetDefault("ForceAssignment", true)
-	viper.SetDefault("ForceAssignment", true)
 	viper.SetDefault("AdditionalNodePools", "")
-	viper.SetDefault("Ticker", 5)
+	viper.SetDefault("Ticker", defaultTicker)
 	viper.SetDefault("AllNodePools", false)
 	viper.SetDefault("OrderByLabelKey", "priority")
 	viper.SetDefault("OrderByDesc", true)
@@ -60,11 +65,12 @@ func setConfigDefaults() {
 }
 
 // NewConfig initialize kubeip configuration
-func NewConfig() (*Config, error) {
-	var AdditionalNodePools []string
+func NewConfig() *Config {
 	viper.SetEnvPrefix("kubeip")
 	viper.AutomaticEnv()
 	setConfigDefaults()
+
+	var AdditionalNodePools []string
 	AdditionalNodePoolsStr := viper.GetString("additionalnodepools")
 	if len(AdditionalNodePoolsStr) > 0 {
 		AdditionalNodePools = strings.Split(AdditionalNodePoolsStr, ",")
@@ -84,5 +90,5 @@ func NewConfig() (*Config, error) {
 		ClearLabels:         viper.GetBool("clearlabels"),
 		DryRun:              viper.GetBool("dryrun"),
 	}
-	return &c, nil
+	return &c
 }

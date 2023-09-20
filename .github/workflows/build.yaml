@@ -18,53 +18,47 @@ on:
 
 jobs:
 
-  docker-build:
+  validate:
 
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message,'[skip ci]') }}
-
+    container: golang:1.21-alpine
     steps:
-      - uses: actions/checkout@v3
+      - name: checkout
+        uses: actions/checkout@v4
 
-      - name: Set up QEMU
+      - name: test
+        shell: sh
+        env:
+          CGO_ENABLED: 0
+        run: |
+          apk --update add ca-certificates tzdata make git bash
+          make lint
+          make test-json
+
+  docker-build:
+
+    runs-on: ubuntu-latest
+    needs: validate
+    if: ${{ !contains(github.event.head_commit.message,'[skip ci]') && github.event_name != 'pull_request' }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: get short sha
+        id: short_sha
+        run: echo ::set-output name=sha::$(git rev-parse --short HEAD)
+
+      - name: get version
+        id: version
+        run: echo ::set-output name=version::$([[ -z "${{ github.event.pull_request.number }}" ]] && echo "sha-${{ steps.short_sha.outputs.sha }}" || echo "pr-${{ github.event.pull_request.number }}")
+
+      - name: set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: set up Docker buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
-
-      - name: builder instance name
-        run: echo ${{ steps.buildx.outputs.name }}
-
-      - name: available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-
-      - name: decide on tag
-        id: prep
-        run: |
-          DOCKER_IMAGE=${{ github.repository }}
-          VERSION=noop
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          elif [[ $GITHUB_REF == refs/heads/* ]]; then
-            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
-            if [ "${{ github.event.repository.default_branch }}" = "$VERSION" ]; then
-              VERSION=edge
-            fi
-          elif [[ $GITHUB_REF == refs/pull/* ]]; then
-            VERSION=pr-${{ github.event.number }}
-          fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}"
-          if [[ $VERSION =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            MINOR=${VERSION%.*}
-            MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}"
-          fi
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
       - name: login to DockerHub
         if: ${{ github.event_name != 'pull_request' }}
@@ -73,13 +67,32 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: prepare meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+          labels: |
+            github.run.id=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            org.opencontainers.image.title=kubeIP
+            org.opencontainers.image.description=kubeIP controller
+            org.opencontainers.image.vendor=DoiT International
+
       - name: build and push
-        id: docker_build
         uses: docker/build-push-action@v5
         with:
-          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+            COMMIT=${{ steps.short_sha.outputs.sha }}
+            BRANCH=${{ github.ref_name }}
+          push: true
           platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.prep.outputs.tags }}
-
-      - name: image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

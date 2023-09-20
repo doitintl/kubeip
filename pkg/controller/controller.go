@@ -21,21 +21,21 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
-	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/kipcompute"
 	"github.com/doitintl/kubeip/pkg/types"
 	"github.com/doitintl/kubeip/pkg/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"golang.org/x/time/rate"
 	api_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,7 +45,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
+)
+
+const (
+	nodeResource = "node"
+	createEvent  = "create"
+	deleteEvent  = "delete"
+	maxInstances = 100
+	rateLimit    = 10
+	burstTokens  = 100
+	baseDaley    = time.Second
+	maxDelay     = 100 * time.Second
+)
+
+var (
+	errTimeout = errors.New("timeout error")
 )
 
 // AddressInstanceTuple object
@@ -56,14 +72,14 @@ type AddressInstanceTuple struct {
 
 // Controller object
 type Controller struct {
-	logger      *logrus.Entry
+	logger      logrus.FieldLogger
 	clientset   kubernetes.Interface
 	queue       workqueue.RateLimitingInterface
 	informer    cache.SharedIndexInformer
 	instance    chan<- types.Instance
 	projectID   string
 	clusterName string
-	config      *cfg.Config
+	config      *config.Config
 	ticker      *time.Ticker
 	processing  bool
 }
@@ -75,56 +91,91 @@ type Event struct {
 	resourceType string
 }
 
-var serverStartTime time.Time
+var (
+	serverStartTime time.Time
+	errEmptyPath    = errors.New("empty path")
+)
 
-const maxRetries = 5
+const (
+	maxRetries = 5
+	prefix     = "kube-system/kube-proxy-"
+)
 
-const prefix = "kube-system/kube-proxy-"
+func kubeConfigFromPath(kubepath string) (*rest.Config, error) {
+	if kubepath == "" {
+		return nil, errEmptyPath
+	}
+
+	data, err := os.ReadFile(kubepath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading kubeconfig at %s", kubepath)
+	}
+
+	cfg, err := clientcmd.RESTConfigFromKubeConfig(data)
+	if err != nil {
+		return nil, errors.Wrapf(err, "building rest config from kubeconfig at %s", kubepath)
+	}
+
+	return cfg, nil
+}
+
+func retrieveKubeConfig(log logrus.FieldLogger, cfg *config.Config) (*rest.Config, error) {
+	kubeconfig, err := kubeConfigFromPath(cfg.KubeConfigPath)
+	if err != nil && !errors.Is(err, errEmptyPath) {
+		return nil, errors.Wrap(err, "retrieving kube config from path")
+	}
+
+	if kubeconfig != nil {
+		log.Debug("using kube config from env variables")
+		return kubeconfig, nil
+	}
+
+	inClusterConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "retrieving in cluster kube config")
+	}
+	log.Debug("using in cluster kube config")
+	return inClusterConfig, nil
+}
 
 // Start kubeip controller
-func Start(config *cfg.Config) error {
-	var kubeClient kubernetes.Interface
-	_, err := rest.InClusterConfig()
+func Start(log logrus.FieldLogger, project, cluster string, cfg *config.Config) error {
+	restconfig, err := retrieveKubeConfig(log, cfg)
 	if err != nil {
-		logrus.Fatal(err)
-	} else {
-		kubeClient = utils.GetClient()
+		return errors.Wrap(err, "retrieving kube config")
+	}
+	kubeClient, err := kubernetes.NewForConfig(restconfig)
+	if err != nil {
+		return errors.Wrap(err, "initializing kubernetes client")
 	}
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).List(context.Background(), options)
+				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).List(context.Background(), options) //nolint:wrapcheck
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).Watch(context.Background(), options)
+				return kubeClient.CoreV1().Pods(meta_v1.NamespaceAll).Watch(context.Background(), options) //nolint:wrapcheck
 			},
 		},
 		&api_v1.Pod{},
-		0, //Skip resync
+		0, // Skip resync
 		cache.Indexers{},
 	)
 
-	c := newResourceController(kubeClient, informer, "node")
-	c.projectID, err = kipcompute.ProjectName()
+	ctrl, err := newResourceController(log, project, cluster, kubeClient, informer)
 	if err != nil {
-		logrus.Fatal(err)
-		return err
+		return errors.Wrap(err, "creating resource controller")
 	}
-	c.clusterName, err = kipcompute.ClusterName()
-	if err != nil {
-		logrus.Fatal(err)
-		return err
-	}
-	c.config = config
-	c.ticker = time.NewTicker(c.config.Ticker * time.Minute)
+	ctrl.config = cfg
+	ctrl.ticker = time.NewTicker(ctrl.config.Ticker)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	//TODO Set size
-	instance := make(chan types.Instance, 100)
-	c.instance = instance
-	go c.Run(stopCh)
-	go c.forceAssignment()
-	kipcompute.Kubeip(instance, c.config)
+	// TODO Set size
+	instance := make(chan types.Instance, maxInstances)
+	ctrl.instance = instance
+	go ctrl.Run(stopCh)
+	go ctrl.forceAssignment()
+	kipcompute.Kubeip(instance, cfg)
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGTERM)
 	signal.Notify(sigterm, syscall.SIGINT)
@@ -133,40 +184,40 @@ func Start(config *cfg.Config) error {
 	return nil
 }
 
-func newResourceController(client kubernetes.Interface, informer cache.SharedIndexInformer, resourceType string) *Controller {
+func newResourceController(log logrus.FieldLogger, project, cluster string, client kubernetes.Interface, informer cache.SharedIndexInformer) (*Controller, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(1*time.Second, 100*time.Second),
+		workqueue.NewItemExponentialFailureRateLimiter(baseDaley, maxDelay),
 		// 10 qps, 100 bucket size.  This is only for retry speed, and it's only the overall factor (not per item)
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(rateLimit), burstTokens)},
 	))
-	var newEvent Event
-	var err error
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			newEvent.key, err = cache.MetaNamespaceKeyFunc(obj)
-			newEvent.eventType = "create"
-			newEvent.resourceType = resourceType
+			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
-				queue.Add(newEvent)
+				queue.Add(&Event{key, createEvent, nodeResource})
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			newEvent.key, err = cache.MetaNamespaceKeyFunc(obj)
-			newEvent.eventType = "delete"
-			newEvent.resourceType = resourceType
+			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
-				queue.Add(newEvent)
+				queue.Add(&Event{key, deleteEvent, nodeResource})
 			}
 		},
 	})
+	if err != nil {
+		return nil, errors.Wrap(err, "adding event handler")
+	}
 
 	return &Controller{
-		logger:     logrus.WithField("pkg", "kubeip-"+resourceType),
-		clientset:  client,
-		informer:   informer,
-		queue:      queue,
-		processing: false,
-	}
+		logger:      log.WithField("pkg", "kubeip-node"),
+		projectID:   project,
+		clusterName: cluster,
+		clientset:   client,
+		informer:    informer,
+		queue:       queue,
+		processing:  false,
+	}, nil
 }
 
 // Run starts the kubeip controller
@@ -180,7 +231,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	go c.informer.Run(stopCh)
 
 	if !cache.WaitForCacheSync(stopCh, c.HasSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		utilruntime.HandleError(errTimeout)
 		return
 	}
 
@@ -201,7 +252,6 @@ func (c *Controller) LastSyncResourceVersion() string {
 
 func (c *Controller) runWorker() {
 	for c.processNextItem() {
-		// continue looping
 	}
 }
 
@@ -246,7 +296,7 @@ func (c *Controller) isNodePoolMonitored(pool string) bool {
 func (c *Controller) processItem(newEvent Event) error {
 	obj, _, err := c.informer.GetIndexer().GetByKey(newEvent.key)
 	if err != nil {
-		return fmt.Errorf("error fetching object with key %s from store: %v", newEvent.key, err)
+		return errors.Wrapf(err, "getting object from informer by key %s", newEvent.key)
 	}
 	// get object's metadata
 	objectMeta := utils.GetObjectMetaData(obj)
@@ -305,12 +355,11 @@ func (c *Controller) processItem(newEvent Event) error {
 				return nil
 			}
 		}
-
 	}
 	return nil
 }
 
-func isNodeReady(node api_v1.Node) bool {
+func isNodeReady(node *api_v1.Node) bool {
 	for _, condition := range node.Status.Conditions {
 		if condition.Type == api_v1.NodeReady {
 			// If the node is unknown we assume that it is ready, we do not want to do IP changes so rapidly.
@@ -320,38 +369,36 @@ func isNodeReady(node api_v1.Node) bool {
 	return false
 }
 
-func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
+func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) { //nolint:funlen,gocognit,gocyclo
 	kubeClient := utils.GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
 	nodelist, _ := kubeClient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
-	var pool string
-	var ok bool
-	var nodesOfInterest []types.Instance
+	nodesOfInterest := make([]types.Instance, 0, len(nodelist.Items))
 
-	for _, node := range nodelist.Items {
-		labels := node.GetLabels()
-		if pool, ok = labels["cloud.google.com/gke-nodepool"]; ok {
+	for node := range nodelist.Items {
+		var inst types.Instance
+		labels := nodelist.Items[node].GetLabels()
+		if pool, ok := labels["cloud.google.com/gke-nodepool"]; ok {
 			if !c.isNodePoolMonitored(pool) {
 				continue
 			}
+			inst.Pool = pool
 		} else {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Did not found node pool")
 			continue
 		}
-		var inst types.Instance
+
 		if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
 			inst.Zone = nodeZone
 		} else {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Did not find zone")
 			continue
 		}
-
 		inst.ProjectID = c.projectID
-		inst.Name = node.GetName()
-		inst.Pool = pool
+		inst.Name = nodelist.Items[node].GetName()
 
 		// If node is not ready we will basically remove the node IP just in case
-		if !isNodeReady(node) {
+		if !isNodeReady(&nodelist.Items[node]) {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Node %s in zone %s is not ready, removing IP so we can reuse it. ", inst.Name, inst.Zone)
 			// Delete the IP we will re-assign this
 			err := kipcompute.DeleteIP(c.projectID, inst.Zone, inst.Name, c.config)
@@ -362,7 +409,6 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 			}
 			continue
 		}
-
 		nodesOfInterest = append(nodesOfInterest, inst)
 	}
 
@@ -421,7 +467,6 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 			if len(toRemove) > 0 {
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Found %d ips %s in region %s which are not part of the top most addresses %s", len(toRemove), toRemove, region, topMostAddresses)
 				for _, remove := range toRemove {
-
 					logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Instance %s in project %s in region %s uses suboptimal IP %s... Removing so we reassign", remove.instance.Name, c.projectID, region, toRemove)
 					// Delete the IP we will re-assign this
 					err := kipcompute.DeleteIP(c.projectID, remove.instance.Zone, remove.instance.Name, c.config)
@@ -467,7 +512,8 @@ func (c *Controller) forceAssignment() {
 }
 
 func (c *Controller) assignMissingTags() {
-	nodePools := append(c.config.AdditionalNodePools, c.config.NodePool)
+	nodePools := c.config.AdditionalNodePools
+	nodePools = append(nodePools, c.config.NodePool)
 
 	kubeClient := utils.GetClient()
 
@@ -479,7 +525,6 @@ func (c *Controller) assignMissingTags() {
 		if err != nil {
 			logrus.Error(err)
 			continue
-
 		}
 		for _, node := range nodelist.Items {
 			labels := node.GetLabels()
@@ -490,7 +535,6 @@ func (c *Controller) assignMissingTags() {
 				}
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
 				kipcompute.AddTagIfMissing(c.projectID, node.GetName(), nodeZone, c.config)
-
 			} else {
 				continue
 			}

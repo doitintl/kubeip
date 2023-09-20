@@ -1,4 +1,4 @@
-// Copyright © 2021 DoiT International
+// Copyright © 2023 DoiT International
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -17,43 +17,47 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
-
 package main
 
 import (
-	c "github.com/doitintl/kubeip/pkg/client"
-	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/controller"
 	"github.com/doitintl/kubeip/pkg/kipcompute"
 	"github.com/sirupsen/logrus"
 )
 
-var config *cfg.Config
-var version string
-var buildDate string
+var (
+	version   string
+	buildDate string
+	gitCommit string
+	gitBranch string
+)
 
 func main() {
-	config, _ = cfg.NewConfig()
-	logrus.Info(config)
+	logger := logrus.New()
+	cfg := config.NewConfig()
+	logger.Info(cfg)
+
 	cluster, err := kipcompute.ClusterName()
 	if err != nil {
-		logrus.Fatal(err)
-		panic(err)
+		logger.WithError(err).Fatal("Failed to get cluster name")
 	}
-	projectID, err := kipcompute.ProjectName()
+
+	project, err := kipcompute.ProjectName()
 	if err != nil {
-		logrus.Fatal(err)
-		panic(err)
+		logger.WithError(err).Fatal("Failed to get project name")
 	}
-	logrus.Info(config.AdditionalNodePools)
-	logrus.WithFields(logrus.Fields{
-		"Cluster name": cluster,
-		"Project name": projectID,
-		"Version":      version,
-		"Build Date":   buildDate,
+
+	logger.WithFields(logrus.Fields{
+		"Cluster":    cluster,
+		"Project":    project,
+		"Version":    version,
+		"Build Date": buildDate,
+		"Git Commit": gitCommit,
+		"Git Branch": gitBranch,
 	}).Info("kubeIP is starting")
-	err = c.Run(config)
-	if err != nil {
-		logrus.Fatal(err)
-		panic(err)
+
+	if err = controller.Start(logger, project, cluster, cfg); err != nil {
+		logrus.WithError(err).Fatal("Failed to start kubeIP controller")
 	}
 }

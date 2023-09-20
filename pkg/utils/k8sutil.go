@@ -22,13 +22,12 @@ package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 
-	cfg "github.com/doitintl/kubeip/pkg/config"
+	"github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
-
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
@@ -61,12 +60,12 @@ func Contains(s []string, e string) bool {
 
 // GetClient returns a k8s clientset to the request from inside of cluster
 func GetClient() kubernetes.Interface {
-	config, err := rest.InClusterConfig()
+	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		logrus.Fatalf("Can not get kubernetes config: %v", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		logrus.Fatalf("Can not create kubernetes client: %v", err)
 	}
@@ -76,7 +75,6 @@ func GetClient() kubernetes.Interface {
 
 // GetObjectMetaData returns metadata of a given k8s object
 func GetObjectMetaData(obj interface{}) metav1.ObjectMeta {
-
 	var objectMeta metav1.ObjectMeta
 
 	switch object := obj.(type) {
@@ -106,11 +104,11 @@ func GetObjectMetaData(obj interface{}) metav1.ObjectMeta {
 	return objectMeta
 }
 
-func clearLabels(m map[string]string, config *cfg.Config) string {
+func clearLabels(m map[string]string, cfg *config.Config) string {
 	stringBuffer := new(bytes.Buffer)
 	for key := range m {
-		if !strings.EqualFold(key, config.OrderByLabelKey) &&
-			!strings.EqualFold(key, config.LabelKey) &&
+		if !strings.EqualFold(key, cfg.OrderByLabelKey) &&
+			!strings.EqualFold(key, cfg.LabelKey) &&
 			!strings.Contains(key, "kubip_assigned") &&
 			!strings.Contains(key, "kubernetes") &&
 			!strings.Contains(key, "google") &&
@@ -121,11 +119,11 @@ func clearLabels(m map[string]string, config *cfg.Config) string {
 	return stringBuffer.String()
 }
 
-func createLabelKeyValuePairs(m map[string]string, config *cfg.Config) string {
+func createLabelKeyValuePairs(m map[string]string, cfg *config.Config) string {
 	stringBuffer := new(bytes.Buffer)
 	for key, value := range m {
-		if !strings.EqualFold(key, config.OrderByLabelKey) &&
-			!strings.EqualFold(key, config.LabelKey) &&
+		if !strings.EqualFold(key, cfg.OrderByLabelKey) &&
+			!strings.EqualFold(key, cfg.LabelKey) &&
 			!strings.Contains(key, "kubip_assigned") &&
 			!strings.Contains(key, "kubernetes") &&
 			!strings.Contains(key, "google") &&
@@ -137,34 +135,35 @@ func createLabelKeyValuePairs(m map[string]string, config *cfg.Config) string {
 }
 
 // TagNode tag GKE node with "kubip_assigned" label (with typo) and also copy the labels present on the address if the copyLabels flag is set to true
-func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
+func TagNode(node string, ip *types.IPAddress, cfg *config.Config) {
 	kubeClient := GetClient()
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip.IP)
-	dashIP := strings.Replace(ip.IP, ".", "-", 4)
+	// replace . with - in IP address
+	dashIP := strings.Replace(ip.IP, ".", "-", 4) //nolint:gomnd
 	var labelString string
 
-	if config.CopyLabels {
+	if cfg.CopyLabels {
 		var labelsToClear string
-		if config.ClearLabels {
+		if cfg.ClearLabels {
 			result, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, metav1.GetOptions{})
 			if err != nil {
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Error(err)
 			} else {
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Clear label tag for node %s with ip %s and clear tags %s", node, ip.IP, result.Labels)
-				createLabelKeyValuePairs(result.Labels, config)
-				labelsToClear = clearLabels(result.Labels, config)
+				createLabelKeyValuePairs(result.Labels, cfg)
+				labelsToClear = clearLabels(result.Labels, cfg)
 			}
 		} else {
 			labelsToClear = ""
 		}
 
-		labelString = "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + labelsToClear + createLabelKeyValuePairs(ip.Labels, config) + "}"
+		labelString = "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + labelsToClear + createLabelKeyValuePairs(ip.Labels, cfg) + "}"
 	} else {
 		labelString = "{" + "\"" + "kubip_assigned" + "\":\"" + dashIP + "\"" + "}"
 	}
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 
-	if config.DryRun {
+	if cfg.DryRun {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
 	} else {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
@@ -174,24 +173,21 @@ func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
 			logrus.Error(err)
 		}
 	}
-
 }
 
 // GetNodeByIP get GKE node by IP
 func GetNodeByIP(ip string) (string, error) {
 	kubeClient := GetClient()
-	dashIP := strings.Replace(ip, ".", "-", 4)
+	dashIP := strings.Replace(ip, ".", "-", 4) //nolint:gomnd
 	label := fmt.Sprintf("kubip_assigned=%v", dashIP)
 	l, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
 		LabelSelector: label,
 	})
 	if err != nil {
-		logrus.Error(err)
-		return "", err
+		return "", errors.Wrap(err, "failed to list nodes")
 	}
 	if len(l.Items) == 0 {
 		return "", errors.New("did not found matching node with IP")
 	}
 	return l.Items[0].GetName(), nil
-
 }
