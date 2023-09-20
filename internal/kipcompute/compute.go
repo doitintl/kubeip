@@ -21,7 +21,6 @@
 package kipcompute
 
 import (
-	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -33,7 +32,6 @@ import (
 	"github.com/doitintl/kubeip/internal/types"
 	"github.com/doitintl/kubeip/internal/utils"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/api/compute/v0.beta" //nolint:goimports
 )
@@ -64,11 +62,6 @@ func getPriorityOrder(address *compute.Address, cfg *config.Config) int {
 	if ok {
 		intVal, err := strconv.Atoi(strVal)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"internal": "kubeip",
-				"function": "getPriorityOrder",
-			}).WithError(err).
-				Errorf("Address %s has errors. Failed to convert order by label value %s with value %s to integer", address.Name, cfg.OrderByLabelKey, strVal)
 			return defaultValue
 		}
 		return intVal
@@ -148,9 +141,7 @@ func DeleteIP(projectID, zone, instance string, cfg *config.Config) error {
 	}
 	if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
 		accessConfigName := inst.NetworkInterfaces[0].AccessConfigs[0].Name
-		if cfg.DryRun {
-			logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "DeleteIP"}).Infof("Deleted Access Config for %s zone %s new ip %s", instance, zone, accessConfigName)
-		} else {
+		if !cfg.DryRun {
 			op, err := computeService.Instances.DeleteAccessConfig(projectID, zone, instance, accessConfigName, "nic0").Do()
 			if err != nil {
 				return errors.Wrap(err, "failed to delete access config")
@@ -161,7 +152,6 @@ func DeleteIP(projectID, zone, instance string, cfg *config.Config) error {
 			}
 		}
 	}
-	logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "DeleteIP"}).Infof("Deleted IP for %s zone %s", instance, zone)
 	// Delete an prior tags.
 	utils.TagNode(instance, &types.IPAddress{IP: "0.0.0.0", Labels: map[string]string{}}, cfg)
 	return nil
@@ -172,9 +162,7 @@ func addIP(projectID, zone, instance string, addr *types.IPAddress, cfg *config.
 	if err != nil {
 		return errors.Wrap(err, "failed to get create compute service")
 	}
-	if cfg.DryRun {
-		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "addIP"}).Infof("Added Access Config for %s zone %s new ip %s", instance, zone, addr.IP)
-	} else {
+	if !cfg.DryRun {
 		accessConfig := &compute.AccessConfig{
 			Name:  "External NAT",
 			Type:  "ONE_TO_ONE_NAT",
@@ -191,8 +179,6 @@ func addIP(projectID, zone, instance string, addr *types.IPAddress, cfg *config.
 			return errors.Wrap(err, "failed to wait for compilation")
 		}
 	}
-
-	logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "addIP"}).Infof("Added IP for %s zone %s new ip %s", instance, zone, addr.IP)
 	return nil
 }
 
@@ -214,7 +200,6 @@ func replaceIP(projectID, zone, instance, pool string, cfg *config.Config) error
 		return errors.Wrap(err, "failed to add IP")
 	}
 
-	logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr.IP)
 	oldNode, err := utils.GetNodeByIP(addr.IP)
 	if err == nil {
 		utils.TagNode(oldNode, &types.IPAddress{IP: "0.0.0.0", Labels: map[string]string{}}, cfg)
@@ -269,14 +254,12 @@ func GetAddressUsedByInstance(projectID, instance, zone string, cfg *config.Conf
 func IsInstanceUsesReservedIP(projectID, instance, zone string, cfg *config.Config) bool {
 	computeService, err := compute.NewService(context.Background())
 	if err != nil {
-		logrus.WithError(err).Error("failed to get create compute service")
 		return false
 	}
 	region := zone[:len(zone)-2]
 	filter := "(labels." + cfg.LabelKey + "=" + cfg.LabelValue + ")"
 	addresses, err := computeService.Addresses.List(projectID, region).Filter("(status=IN_USE) AND " + filter).Do()
 	if err != nil {
-		logrus.Error(err)
 		return false
 	}
 
@@ -292,7 +275,6 @@ func IsInstanceUsesReservedIP(projectID, instance, zone string, cfg *config.Conf
 func Kubeip(instance <-chan types.Instance, cfg *config.Config) {
 	for {
 		inst := <-instance
-		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "Kubeip"}).Infof("Working on %s in zone %s", inst.Name, inst.Zone)
 		_ = replaceIP(inst.ProjectID, inst.Zone, inst.Name, inst.Pool, cfg)
 	}
 }
@@ -311,7 +293,6 @@ func getAddressDetails(ip, region, projectID string) (*types.IPAddress, error) {
 
 	if len(addresses.Items) != 1 {
 		address := addresses.Items[0]
-		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "getAddressDetails"}).Infof("Node ip is reserved %s %s", ip, fmt.Sprint(address.Labels))
 		return &types.IPAddress{IP: address.Address, Labels: address.Labels}, nil
 	}
 
@@ -321,18 +302,15 @@ func getAddressDetails(ip, region, projectID string) (*types.IPAddress, error) {
 func isAddressReserved(ip, region, projectID string) bool {
 	computeService, err := compute.NewService(context.Background())
 	if err != nil {
-		logrus.WithError(err).Error("failed to get create compute service")
 		return false
 	}
 	filter := "address=" + "\"" + ip + "\""
 	addresses, err := computeService.Addresses.List(projectID, region).Filter(filter).Do()
 	if err != nil {
-		logrus.Error(err)
 		return false
 	}
 
 	if len(addresses.Items) != 0 {
-		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "isAddressReserved"}).Infof("Node ip is reserved %s", ip)
 		return true
 	}
 	return false
@@ -342,7 +320,6 @@ func isAddressReserved(ip, region, projectID string) bool {
 func AddTagIfMissing(projectID, instance, zone string, cfg *config.Config) {
 	computeService, err := compute.NewService(context.Background())
 	if err != nil {
-		logrus.WithError(err).Error("failed to get create compute service")
 		return
 	}
 	inst, err := computeService.Instances.Get(projectID, zone, instance).Do()
@@ -360,7 +337,6 @@ func AddTagIfMissing(projectID, instance, zone string, cfg *config.Config) {
 		if err != nil {
 			return
 		}
-		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "AddTagIfMissing"}).Infof("Tagging %s", instance)
 		utils.TagNode(instance, addressDetails, cfg)
 	}
 }

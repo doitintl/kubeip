@@ -203,18 +203,14 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	c.logger.Info("Starting kubeip controller")
 	serverStartTime = time.Now().Local()
-
 	go c.informer.Run(stopCh)
-
 	if !cache.WaitForCacheSync(stopCh, c.HasSynced) {
 		utilruntime.HandleError(errTimeout)
 		return
 	}
 
 	c.logger.Info("kubeip controller synced and ready")
-
 	wait.Until(c.runWorker, time.Second, stopCh)
 }
 
@@ -420,15 +416,13 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) error 
 				})
 			}
 
-			// Perform subtraction
-			c.logger.Infof("project %s in region %s should use the following IPs %s... Checking that the instances follow these assignments", c.projectID, region, topMostAddresses)
+			// Remove all addresses that are not in the top most addresses.
 			var toRemove []AddressInstanceTuple
 			for _, usedAddress := range usedAddresses {
 				if usedAddress.address != "0.0.0.0" && !utils.Contains(topMostAddresses, usedAddress.address) {
 					toRemove = append(toRemove, usedAddress)
 				}
 			}
-
 			if len(toRemove) > 0 {
 				for _, remove := range toRemove {
 					// Delete the IP we will re-assign this
@@ -441,6 +435,7 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) error 
 		}
 	}
 
+	// Find all nodes that do not have an IP assigned and send them to the channel for assignment.
 	for _, inst := range nodesOfInterest {
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
 			c.logger.WithFields(logrus.Fields{
