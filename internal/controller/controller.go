@@ -443,7 +443,10 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) error 
 
 	for _, inst := range nodesOfInterest {
 		if !kipcompute.IsInstanceUsesReservedIP(c.projectID, inst.Name, inst.Zone, c.config) {
-			logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "processAllNodes"}).Infof("Found unassigned node %s in pool %s", inst.Name, inst.Pool)
+			c.logger.WithFields(logrus.Fields{
+				"instance": inst.Name,
+				"pool":     inst.Pool,
+			}).Debugf("found unassigned node in pool")
 			c.instance <- inst
 		}
 	}
