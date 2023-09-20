@@ -3,6 +3,9 @@ FROM golang:1.21-alpine AS builder
 # add CA certificates and TZ for local time
 RUN apk --update add ca-certificates tzdata make git
 
+# create a working directory
+WORKDIR /app
+
 # Retrieve application dependencies.
 # This allows the container build to reuse cached dependencies.
 # Expecting to copy go.mod and if present go.sum.
