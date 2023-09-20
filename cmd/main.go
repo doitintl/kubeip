@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/doitintl/kubeip/pkg/config"
-	"github.com/doitintl/kubeip/pkg/controller"
-	"github.com/doitintl/kubeip/pkg/kipcompute"
+	"github.com/doitintl/kubeip/internal/config"
+	"github.com/doitintl/kubeip/internal/controller"
+	"github.com/doitintl/kubeip/internal/kipcompute"
 	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
@@ -67,8 +67,11 @@ func main() {
 	}
 
 	logger = logger.WithFields(logrus.Fields{
-		"cluster": cluster,
-		"project": project,
+		"cluster":   cluster,
+		"project":   project,
+		"branch":    gitBranch,
+		"commit":    gitCommit,
+		"buildDate": buildDate,
 	})
 	logger.Info("starting kubeIP controller")
 

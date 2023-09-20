@@ -1,23 +1,3 @@
-// Copyright © 2021 DoiT International
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
 package utils
 
 import (
@@ -25,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/doitintl/kubeip/pkg/config"
-	"github.com/doitintl/kubeip/pkg/types"
+	"github.com/doitintl/kubeip/internal/config"
+	"github.com/doitintl/kubeip/internal/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -137,7 +117,7 @@ func createLabelKeyValuePairs(m map[string]string, cfg *config.Config) string {
 // TagNode tag GKE node with "kubip_assigned" label (with typo) and also copy the labels present on the address if the copyLabels flag is set to true
 func TagNode(node string, ip *types.IPAddress, cfg *config.Config) {
 	kubeClient := GetClient()
-	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip.IP)
+	logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip.IP)
 	// replace . with - in IP address
 	dashIP := strings.Replace(ip.IP, ".", "-", 4) //nolint:gomnd
 	var labelString string
@@ -147,9 +127,9 @@ func TagNode(node string, ip *types.IPAddress, cfg *config.Config) {
 		if cfg.ClearLabels {
 			result, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, metav1.GetOptions{})
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Error(err)
+				logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Error(err)
 			} else {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Clear label tag for node %s with ip %s and clear tags %s", node, ip.IP, result.Labels)
+				logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Infof("Clear label tag for node %s with ip %s and clear tags %s", node, ip.IP, result.Labels)
 				createLabelKeyValuePairs(result.Labels, cfg)
 				labelsToClear = clearLabels(result.Labels, cfg)
 			}
@@ -164,12 +144,12 @@ func TagNode(node string, ip *types.IPAddress, cfg *config.Config) {
 	patch := fmt.Sprintf(`{"metadata":{"labels":%v}}`, labelString)
 
 	if cfg.DryRun {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
 	} else {
-		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+		logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
 		_, err := kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Error occurred while tagging node %s as %s with tags %s ", node, ip.IP, labelString)
+			logrus.WithFields(logrus.Fields{"internal": "kubeip", "function": "tagNode"}).Infof("Error occurred while tagging node %s as %s with tags %s ", node, ip.IP, labelString)
 			logrus.Error(err)
 		}
 	}
