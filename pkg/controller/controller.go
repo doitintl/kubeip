@@ -21,14 +21,15 @@
 package controller
 
 import (
-	"errors"
 	"fmt"
-	"golang.org/x/time/rate"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/pkg/errors"
+	"golang.org/x/time/rate"
 
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/kipcompute"
@@ -86,9 +87,11 @@ func Start(config *cfg.Config) error {
 	var kubeClient kubernetes.Interface
 	_, err := rest.InClusterConfig()
 	if err != nil {
-		logrus.Fatal(err)
-	} else {
-		kubeClient = utils.GetClient()
+		return errors.Wrap(err, "Can not get kubernetes config")
+	}
+	kubeClient, err = utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "Can not get kubernetes API")
 	}
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -100,26 +103,24 @@ func Start(config *cfg.Config) error {
 			},
 		},
 		&api_v1.Pod{},
-		0, //Skip resync
+		0, // Skip resync
 		cache.Indexers{},
 	)
 
 	c := newResourceController(kubeClient, informer, "node")
 	c.projectID, err = kipcompute.ProjectName()
 	if err != nil {
-		logrus.Fatal(err)
-		return err
+		return errors.Wrap(err, "Can not get project name")
 	}
 	c.clusterName, err = kipcompute.ClusterName()
 	if err != nil {
-		logrus.Fatal(err)
-		return err
+		return errors.Wrap(err, "Can not get cluster name")
 	}
 	c.config = config
 	c.ticker = time.NewTicker(c.config.Ticker * time.Minute)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	//TODO Set size
+	// TODO Set size
 	instance := make(chan types.Instance, 100)
 	c.instance = instance
 	go c.Run(stopCh)
@@ -266,14 +267,17 @@ func (c *Controller) processItem(newEvent Event) error {
 		// Could be Replaced by using Delta or DeltaFIFO
 		if objectMeta.CreationTimestamp.Sub(serverStartTime).Seconds() > 0 {
 			if strings.HasPrefix(newEvent.key, prefix) {
-				kubeClient := utils.GetClient()
+				kubeClient, err := utils.GetClient()
+				if err != nil {
+					return errors.Wrap(err, "Can not get kubernetes API")
+				}
 				node := newEvent.key[len(prefix):]
 				var options meta_v1.GetOptions
 				options.Kind = "Node"
 				options.APIVersion = "1"
 				nodeMeta, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, options)
 				if err != nil {
-					logrus.Infof(err.Error())
+					return errors.Wrap(err, "Can not get node")
 				}
 
 				labels := nodeMeta.Labels
@@ -285,7 +289,6 @@ func (c *Controller) processItem(newEvent Event) error {
 						return nil
 					}
 				} else {
-					logrus.Infof("Did not found node pool.  These are the labels present %s. ", labels)
 					return errors.New("Did not find node pool.  ")
 				}
 				var inst types.Instance
@@ -293,8 +296,7 @@ func (c *Controller) processItem(newEvent Event) error {
 					logrus.Infof("Zone pool found %s", nodeZone)
 					inst.Zone = nodeZone
 				} else {
-					logrus.Info("Did not find zone")
-					return errors.New("Did not find zone.  ")
+					return errors.New("did not find zone")
 				}
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip-" + newEvent.resourceType, "function": "processItem"}).Infof("Processing add to %v: %s ", newEvent.resourceType, node)
 				inst.Name = node
@@ -320,8 +322,11 @@ func isNodeReady(node api_v1.Node) bool {
 	return false
 }
 
-func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
-	kubeClient := utils.GetClient()
+func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) error {
+	kubeClient, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "Can not get kubernetes API")
+	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Info("Collecting Node List...")
 	nodelist, _ := kubeClient.CoreV1().Nodes().List(context.Background(), meta_v1.ListOptions{})
 	var pool string
@@ -354,11 +359,9 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 		if !isNodeReady(node) {
 			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Node %s in zone %s is not ready, removing IP so we can reuse it. ", inst.Name, inst.Zone)
 			// Delete the IP we will re-assign this
-			err := kipcompute.DeleteIP(c.projectID, inst.Zone, inst.Name, c.config)
+			err = kipcompute.DeleteIP(c.projectID, inst.Zone, inst.Name, c.config)
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
-					Errorf("Could not delete IP used by instance %s in zone %s. Aborting.", inst.Name, inst.Zone)
-				return
+				return errors.Wrap(err, "Can not delete IP")
 			}
 			continue
 		}
@@ -383,8 +386,7 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 
 			addresses, err := kipcompute.GetAllAddresses(c.projectID, region, false, c.config)
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Errorf("Could not retrieve addresses for project %s region %s. Aborting.", c.projectID, region)
-				return
+				return errors.Wrap(err, "Can not get all addresses")
 			}
 
 			var topMostAddresses []string
@@ -398,9 +400,7 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 			for _, instance := range instances {
 				address, err := kipcompute.GetAddressUsedByInstance(c.projectID, instance.Name, instance.Zone, c.config)
 				if err != nil {
-					logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
-						Errorf("Could not retrieve address for project %s region %s instance %s. Aborting.", c.projectID, region, instance.Name)
-					return
+					return errors.Wrap(err, "Can not get address used by instance")
 				}
 				usedAddresses = append(usedAddresses, AddressInstanceTuple{
 					address,
@@ -424,11 +424,9 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 
 					logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).Infof("Instance %s in project %s in region %s uses suboptimal IP %s... Removing so we reassign", remove.instance.Name, c.projectID, region, toRemove)
 					// Delete the IP we will re-assign this
-					err := kipcompute.DeleteIP(c.projectID, remove.instance.Zone, remove.instance.Name, c.config)
+					err = kipcompute.DeleteIP(c.projectID, remove.instance.Zone, remove.instance.Name, c.config)
 					if err != nil {
-						logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "processAllNodes"}).
-							Errorf("Could not delete IP %s used by instance %s which is suboptimal. Aborting.", remove.address, remove.instance.Name)
-						return
+						return errors.Wrap(err, "Can not delete IP")
 					}
 				}
 			}
@@ -441,6 +439,7 @@ func (c *Controller) processAllNodes(shouldCheckOptimalIPAssignment bool) {
 			c.instance <- inst
 		}
 	}
+	return nil
 }
 
 func (c *Controller) forceAssignmentOnce(shouldCheckOptimalIPAssignment bool) {
@@ -466,10 +465,13 @@ func (c *Controller) forceAssignment() {
 	}
 }
 
-func (c *Controller) assignMissingTags() {
+func (c *Controller) assignMissingTags() error {
 	nodePools := append(c.config.AdditionalNodePools, c.config.NodePool)
 
-	kubeClient := utils.GetClient()
+	kubeClient, err := utils.GetClient()
+	if err != nil {
+		return errors.Wrap(err, "Can not get kubernetes API")
+	}
 
 	for _, pool := range nodePools {
 		label := fmt.Sprintf("!kubip_assigned,cloud.google.com/gke-nodepool=%s", pool)
@@ -485,7 +487,7 @@ func (c *Controller) assignMissingTags() {
 			labels := node.GetLabels()
 			if nodeZone, ok := labels["failure-domain.beta.kubernetes.io/zone"]; ok {
 				if err != nil {
-					logrus.Fatalf("Could not get authenticated client: %v", err)
+					logrus.WithError(err).Error("Could not get node zone")
 					continue
 				}
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "assignMissingTags"}).Infof("Found node without tag %s", node.GetName())
@@ -496,4 +498,5 @@ func (c *Controller) assignMissingTags() {
 			}
 		}
 	}
+	return nil
 }
