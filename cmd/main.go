@@ -61,7 +61,11 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func run(_ context.Context, _ *logrus.Entry, _ config.Config) error {
+func run(ctx context.Context, log *logrus.Entry, _ config.Config) error {
+	log.Infof("assigning static public IP address to the node")
+
+	<-ctx.Done()
+	log.Info("release static public IP address from the node")
 	return nil
 }
 
