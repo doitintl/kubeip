@@ -73,7 +73,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ github.repository }}
+          images: ${{ github.repository }}-agent
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -83,8 +83,8 @@ jobs:
             type=sha
           labels: |
             github.run.id=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            org.opencontainers.image.title=kubeIP
-            org.opencontainers.image.description=kubeIP controller
+            org.opencontainers.image.title=kubeip-agent
+            org.opencontainers.image.description=kubeip agent
             org.opencontainers.image.vendor=DoiT International
 
       - name: build and push
