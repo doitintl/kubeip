@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/doitintl/kubeip/internal/config"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,12 @@ var (
 	buildDate string
 	gitCommit string
 	gitBranch string
+)
+
+const (
+	// DefaultRetryInterval is the default retry interval
+	defaultRetryInterval = 5 * time.Minute
+	defaultRetryAttempts = 10
 )
 
 func prepareLogger(level string, json bool) *logrus.Entry {
@@ -85,8 +92,22 @@ func main() {
 					},
 					&cli.PathFlag{
 						Name:     "kubeconfig",
-						Usage:    "Path to Kubernetes configuration file (not needed if running in cluster)",
+						Usage:    "path to Kubernetes configuration file (not needed if running in cluster)",
 						EnvVars:  []string{"KUBECONFIG"},
+						Category: "Configuration",
+					},
+					&cli.DurationFlag{
+						Name:     "retry-interval",
+						Usage:    "when the agent fails to assign the static public IP address, it will retry after this interval",
+						Value:    defaultRetryInterval,
+						EnvVars:  []string{"RETRY_INTERVAL"},
+						Category: "Configuration",
+					},
+					&cli.IntFlag{
+						Name:     "retry-attempts",
+						Usage:    "number of attempts to assign the static public IP address",
+						Value:    defaultRetryAttempts,
+						EnvVars:  []string{"RETRY_ATTEMPTS"},
 						Category: "Configuration",
 					},
 					&cli.StringFlag{

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"time"
+
 	"github.com/urfave/cli/v2"
 )
 
@@ -11,8 +13,10 @@ type Config struct {
 	ClusterName string `json:"cluster-name"`
 	// DevelopMode mode
 	DevelopMode bool `json:"develop-mode"`
-	// Weight Model
-
+	// Retry interval
+	RetryInterval time.Duration `json:"retry-interval"`
+	// Retry attempts
+	RetryAttempts int `json:"retry-attempts"`
 }
 
 func LoadConfig(c *cli.Context) Config {
@@ -20,5 +24,6 @@ func LoadConfig(c *cli.Context) Config {
 	cfg.KubeConfigPath = c.String("kubeconfig")
 	cfg.ClusterName = c.String("cluster-name")
 	cfg.DevelopMode = c.Bool("develop-mode")
+	cfg.RetryInterval = c.Duration("retry-interval")
 	return cfg
 }
