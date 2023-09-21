@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"os"
+	"runtime"
+
 	"github.com/doitintl/kubeip/internal/config"
-	"github.com/doitintl/kubeip/internal/controller"
-	"github.com/doitintl/kubeip/internal/kipcompute"
 	"github.com/sirupsen/logrus"
+	"github.com/urfave/cli/v2"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
@@ -50,32 +54,78 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func main() {
+func run(_ context.Context, _ *logrus.Entry, _ config.Config) error {
+	return nil
+}
+
+func runCmd(c *cli.Context) error {
 	ctx := signals.SetupSignalHandler()
-	cfg := config.NewConfig()
-	logger := prepareLogger(cfg.LogLevel, cfg.LogJSON)
-	logger.WithField("config", cfg).Info("using kubeIP configuration")
+	log := prepareLogger(c.String("log-level"), c.Bool("json"))
+	cfg := config.LoadConfig(c)
 
-	cluster, err := kipcompute.ClusterName()
-	if err != nil {
-		logger.WithError(err).Fatal("failed to get cluster name")
+	if err := run(ctx, log, cfg); err != nil {
+		log.Fatalf("eks-lens agent failed: %v", err)
 	}
 
-	project, err := kipcompute.ProjectName()
-	if err != nil {
-		logger.WithError(err).Fatal("failed to get project name")
+	return nil
+}
+
+func main() {
+	app := &cli.App{
+		Commands: []*cli.Command{
+			{
+				Name:  "run",
+				Usage: "run agent",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "cluster-name",
+						Usage:    "Kubernetes cluster name (not needed if running in cluster)",
+						EnvVars:  []string{"CLUSTER_NAME"},
+						Category: "Configuration",
+					},
+					&cli.PathFlag{
+						Name:     "kubeconfig",
+						Usage:    "Path to Kubernetes configuration file (not needed if running in cluster)",
+						EnvVars:  []string{"KUBECONFIG"},
+						Category: "Configuration",
+					},
+					&cli.StringFlag{
+						Name:     "log-level",
+						Usage:    "set log level (debug, info(*), warning, error, fatal, panic)",
+						Value:    "info",
+						EnvVars:  []string{"LOG_LEVEL"},
+						Category: "Logging",
+					},
+					&cli.BoolFlag{
+						Name:     "json",
+						Usage:    "produce log in JSON format: Logstash and Splunk friendly",
+						EnvVars:  []string{"LOG_JSON"},
+						Category: "Logging",
+					},
+					&cli.BoolFlag{
+						Name:     "develop-mode",
+						Usage:    "enable develop mode",
+						EnvVars:  []string{"DEV_MODE"},
+						Category: "Development",
+					},
+				},
+				Action: runCmd,
+			},
+		},
+		Name:    "kubeip-agent",
+		Usage:   "replaces the node's public IP address with a static public IP address",
+		Version: version,
+	}
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Printf("kubeip-agent %s\n", version)
+		fmt.Printf("  Build date: %s\n", buildDate)
+		fmt.Printf("  Git commit: %s\n", gitCommit)
+		fmt.Printf("  Git branch: %s\n", gitBranch)
+		fmt.Printf("  Built with: %s\n", runtime.Version())
 	}
 
-	logger = logger.WithFields(logrus.Fields{
-		"cluster":   cluster,
-		"project":   project,
-		"branch":    gitBranch,
-		"commit":    gitCommit,
-		"buildDate": buildDate,
-	})
-	logger.Info("starting kubeIP controller")
-
-	if err = controller.Start(ctx, logger, project, cluster, cfg); err != nil {
-		logrus.WithError(err).Fatal("failed to start kubeIP controller")
+	err := app.Run(os.Args)
+	if err != nil {
+		logrus.Fatal(err)
 	}
 }
