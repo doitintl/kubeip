@@ -239,7 +239,7 @@ func replaceIP(projectID string, zone string, instance string, pool string, conf
 
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "replaceIP"}).Infof("Replaced IP for %s zone %s new ip %s", instance, zone, addr.IP)
 	oldNode, err := utils.GetNodeByIP(addr.IP)
-	if err == nil {
+	if err != nil {
 		utils.TagNode(oldNode, types.IPAddress{IP: "0.0.0.0", Labels: map[string]string{}}, config)
 	}
 	utils.TagNode(instance, addr, config)

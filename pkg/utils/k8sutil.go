@@ -22,13 +22,12 @@ package utils
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
-
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	appsv1 "k8s.io/api/apps/v1"
@@ -60,18 +59,18 @@ func Contains(s []string, e string) bool {
 }
 
 // GetClient returns a k8s clientset to the request from inside of cluster
-func GetClient() kubernetes.Interface {
+func GetClient() (kubernetes.Interface, error) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		logrus.Fatalf("Can not get kubernetes config: %v", err)
+		return nil, errors.Wrap(err, "Can not get kubernetes config")
 	}
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		logrus.Fatalf("Can not create kubernetes client: %v", err)
+		return nil, errors.Wrap(err, "Can not create kubernetes clientset")
 	}
 
-	return clientset
+	return clientset, nil
 }
 
 // GetObjectMetaData returns metadata of a given k8s object
@@ -137,8 +136,11 @@ func createLabelKeyValuePairs(m map[string]string, config *cfg.Config) string {
 }
 
 // TagNode tag GKE node with "kubip_assigned" label (with typo) and also copy the labels present on the address if the copyLabels flag is set to true
-func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
-	kubeClient := GetClient()
+func TagNode(node string, ip types.IPAddress, config *cfg.Config) error {
+	kubeClient, err := GetClient()
+	if err != nil {
+		return errors.Wrap(err, "Can not get kubernetes API")
+	}
 	logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s", node, ip.IP)
 	dashIP := strings.Replace(ip.IP, ".", "-", 4)
 	var labelString string
@@ -148,7 +150,7 @@ func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
 		if config.ClearLabels {
 			result, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, metav1.GetOptions{})
 			if err != nil {
-				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Error(err)
+				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).WithError(err).Warnf("Can not get node %s", node)
 			} else {
 				logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Clear label tag for node %s with ip %s and clear tags %s", node, ip.IP, result.Labels)
 				createLabelKeyValuePairs(result.Labels, config)
@@ -168,18 +170,20 @@ func TagNode(node string, ip types.IPAddress, config *cfg.Config) {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
 	} else {
 		logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Tagging node %s as %s with tags %s ", node, ip.IP, labelString)
-		_, err := kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
+		_, err = kubeClient.CoreV1().Nodes().Patch(context.Background(), node, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
 		if err != nil {
-			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "tagNode"}).Infof("Error occurred while tagging node %s as %s with tags %s ", node, ip.IP, labelString)
-			logrus.Error(err)
+			return errors.Wrap(err, "Can not patch node")
 		}
 	}
-
+	return nil
 }
 
 // GetNodeByIP get GKE node by IP
 func GetNodeByIP(ip string) (string, error) {
-	kubeClient := GetClient()
+	kubeClient, err := GetClient()
+	if err != nil {
+		return "", errors.Wrap(err, "Can not get kubernetes API")
+	}
 	dashIP := strings.Replace(ip, ".", "-", 4)
 	label := fmt.Sprintf("kubip_assigned=%v", dashIP)
 	l, err := kubeClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
