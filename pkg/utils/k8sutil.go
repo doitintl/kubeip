@@ -233,6 +233,7 @@ func WaitForNodeReady(node string, timeout time.Duration) error {
 			if isNodeReady(n.Status.Conditions) {
 				return nil
 			}
+			logrus.WithFields(logrus.Fields{"pkg": "kubeip", "function": "waitForNodeReady"}).Infof("waiting for node %s to be ready", node)
 			time.Sleep(5 * time.Second)
 		}
 	}
