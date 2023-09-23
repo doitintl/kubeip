@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"time"
 
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
@@ -198,4 +199,41 @@ func GetNodeByIP(ip string) (string, error) {
 	}
 	return l.Items[0].GetName(), nil
 
+}
+
+func isNodeReady(conditions []apiv1.NodeCondition) bool {
+	for _, condition := range conditions {
+		if condition.Type == apiv1.NodeReady {
+			return condition.Status == apiv1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// WaitForNodeReady wait for node to be ready
+func WaitForNodeReady(node string, timeout time.Duration) error {
+	kubeClient, err := GetClient()
+	if err != nil {
+		return errors.Wrap(err, "Can not get kubernetes API")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	for {
+		select {
+		case <-ctx.Done():
+			return errors.New("timeout waiting for node to be ready")
+		default:
+			var options metav1.GetOptions
+			options.Kind = "Node"
+			options.APIVersion = "1"
+			n, err := kubeClient.CoreV1().Nodes().Get(context.Background(), node, options)
+			if err != nil {
+				return errors.Wrap(err, "can not get node")
+			}
+			if isNodeReady(n.Status.Conditions) {
+				return nil
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}
 }
