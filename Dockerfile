@@ -16,9 +16,7 @@ COPY go.sum .
 RUN --mount=type=cache,target=/root/.cache/go-build go mod download
 
 # copy sources
-COPY main.go .
-COPY pkg ./pkg
-COPY .git ./.git
+COPY . .
 
 # build arguments (passed from buildx)
 ARG TARGETOS
