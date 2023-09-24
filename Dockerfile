@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=$GOPATH/pkg/mod go mod download
 # copy sources
 COPY . .
 # build
-RUN make binary
+RUN make binary TARGETOS=${TARGETOS} TARGETARCH=${TARGETARCH}
 
 #
 # ------ release Docker image ------

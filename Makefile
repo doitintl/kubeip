@@ -8,8 +8,11 @@ PKGS     = $(or $(PKG),$(shell env GO111MODULE=on $(GO) list ./...))
 TESTPKGS = $(shell env GO111MODULE=on $(GO) list -f \
 			'{{ if or .TestGoFiles .XTestGoFiles }}{{ .ImportPath }}{{ end }}' \
 			$(PKGS))
-BIN      = $(CURDIR)/.bin
-BINARY = kubeip
+
+BIN        := $(CURDIR)/.bin
+BINARY      = kubeip
+TARGETOS   := $(or $(TARGETOS), linux)
+TARGETARCH := $(or $(TARGETARCH), amd64)
 
 GO      = go
 TIMEOUT = 15
@@ -17,16 +20,16 @@ V = 0
 Q = $(if $(filter 1,$V),,@)
 M = $(shell printf "\033[34;1m▶\033[0m")
 
-export GO111MODULE=on
 export CGO_ENABLED=0
 export GOPROXY=https://proxy.golang.org
-
+export GOOS=$(TARGETOS)
+export GOARCH=$(TARGETARCH)
 
 .PHONY: all
 all: fmt lint binary
 
 .PHONY: binary
-binary: $(BIN) ; $(info $(M) building executable...) @ ## Build program binary
+binary: $(BIN) ; $(info $(M) building $(GOOS)/$(GOARCH) binary...) @ ## Build program binary
 	$Q $(GO) build \
 		-tags release \
 		-ldflags '-X main.version=$(VERSION) -X main.buildDate=$(DATE)' \
