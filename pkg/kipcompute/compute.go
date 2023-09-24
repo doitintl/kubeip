@@ -21,7 +21,6 @@
 package kipcompute
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -33,6 +32,7 @@ import (
 	cfg "github.com/doitintl/kubeip/pkg/config"
 	"github.com/doitintl/kubeip/pkg/types"
 	"github.com/doitintl/kubeip/pkg/utils"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -217,23 +217,29 @@ func addIP(projectID string, zone string, instance string, pool string, addr typ
 }
 
 func replaceIP(projectID string, zone string, instance string, pool string, config *cfg.Config) error {
+	// wait for node to be ready with timeout of 5 minutes: this should be enough for the node to be ready
+	err := utils.WaitForNodeReady(instance, 5*time.Minute)
+	if err != nil {
+		return errors.Wrap(err, "error waiting for node to be ready")
+	}
+
 	region := zone[:len(zone)-2]
 	addr, err := findFreeAddress(projectID, region, pool, config)
 	// Check if we found address.
 	if err != nil {
-		logrus.Infof(err.Error())
+		logrus.WithError(err).Error("can not find free address")
 		return err
 	}
 
 	err = DeleteIP(projectID, zone, instance, config)
 	if err != nil {
-		logrus.Infof(err.Error())
+		logrus.WithError(err).Error("can not delete ip")
 		return err
 	}
 
 	err = addIP(projectID, zone, instance, pool, addr, config)
 	if err != nil {
-		logrus.Infof(err.Error())
+		logrus.WithError(err).Error("can not add ip")
 		return err
 	}
 
