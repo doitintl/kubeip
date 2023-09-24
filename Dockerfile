@@ -1,26 +1,29 @@
-# syntax = docker/dockerfile:experimental
-
-#
-# ----- Go Builder Image ------
-#
-FROM golang:1.20-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.20-alpine AS builder
 # curl git bash
 RUN apk add --no-cache curl git bash make
-#
+
 # ----- build and test -----
-#
 FROM builder as build
+
 # set working directorydoc
 RUN mkdir -p /go/src/app
 WORKDIR /go/src/app
+
 # load dependency
+COPY Makefile .
 COPY go.mod .
 COPY go.sum .
-RUN --mount=type=cache,target=$GOPATH/pkg/mod go mod download
+RUN --mount=type=cache,target=/root/.cache/go-build go mod download
+
 # copy sources
 COPY . .
+
+# build arguments (passed from buildx)
+ARG TARGETOS
+ARG TARGETARCH
+
 # build
-RUN make binary
+RUN --mount=type=cache,target=/root/.cache/go-build make binary TARGETOS=${TARGETOS} TARGETARCH=${TARGETARCH}
 
 #
 # ------ release Docker image ------

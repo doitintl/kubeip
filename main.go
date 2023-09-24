@@ -33,6 +33,7 @@ var buildDate string
 
 func main() {
 	config, _ = cfg.NewConfig()
+	logrus.Info("kubeIP version: ", version)
 	logrus.Info(config)
 	cluster, err := kipcompute.ClusterName()
 	if err != nil {
