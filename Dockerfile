@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
 
 # add CA certificates and TZ for local time
 RUN apk --update add ca-certificates tzdata make git
@@ -19,9 +19,11 @@ COPY . ./
 ARG VERSION
 ARG COMMIT
 ARG BRANCH
+ARG TARGETOS
+ARG TARGETARCH
 
 # Build the binary with make (using the version, commit and branch)
-RUN make build VERSION=${VERSION} COMMIT=${COMMIT} BRANCH=${BRANCH}
+RUN make build VERSION=${VERSION} COMMIT=${COMMIT} BRANCH=${BRANCH} TARGETOS=${TARGETOS} TARGETARCH=${TARGETARCH}
 
 # final image
 FROM scratch

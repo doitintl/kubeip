@@ -10,7 +10,9 @@ GOLINT=golangci-lint
 LINT_CONFIG = $(CURDIR)/.golangci.yaml
 
 BIN=$(CURDIR)/.bin
-BINARY_NAME=kubeip
+BINARY_NAME=kubeip-agent
+TARGETOS   := $(or $(TARGETOS), linux)
+TARGETARCH := $(or $(TARGETARCH), amd64)
 
 DATE    ?= $(shell date +%FT%T%z)
 
@@ -27,6 +29,8 @@ Q = $(if $(filter 1,$V),,@)
 M = $(shell printf "\033[34;1m▶\033[0m")
 
 export CGO_ENABLED=0
+export GOOS=$(TARGETOS)
+export GOARCH=$(TARGETARCH)
 
 # main task
 all: lint test build ; $(info $(M) build, test and deploy ...) @ ## release cycle
@@ -37,7 +41,7 @@ setup-lint:
 
 # Tasks
 
-build: ; $(info $(M) building binary ...) @ ## build with local Go SDK
+build: ; $(info $(M) building $(GOOS)/$(GOARCH) binary...) @ ## build with local Go SDK
 	$(GOBUILD) -v \
 	-ldflags '-X main.version=$(VERSION) -X main.buildDate=$(DATE) -X main.gitCommit=$(COMMIT) -X main.gitBranch=$(BRANCH)' \
 	-o $(BIN)/$(BINARY_NAME) ./cmd/.
