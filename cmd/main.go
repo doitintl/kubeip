@@ -97,7 +97,7 @@ func run(c context.Context, log *logrus.Entry, cfg config.Config) error {
 	}
 
 	explorer := node.NewExplorer(clientset)
-	n, err := explorer.GetNode(ctx)
+	n, err := explorer.GetNode(ctx, cfg.NodeName)
 	if err != nil {
 		return errors.Wrap(err, "getting node")
 	}
@@ -131,7 +131,7 @@ func main() {
 					&cli.StringFlag{
 						Name:     "node-name",
 						Usage:    "Kubernetes node name (not needed if running in node)",
-						EnvVars:  []string{"CLUSTER_NAME"},
+						EnvVars:  []string{"NODE_NAME"},
 						Category: "Configuration",
 					},
 					&cli.PathFlag{

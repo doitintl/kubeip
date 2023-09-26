@@ -9,8 +9,8 @@ import (
 type Config struct {
 	// KubeConfigPath is the path to the kubeconfig file
 	KubeConfigPath string `json:"kubeconfig"`
-	// ClusterName is the name of the EKS node
-	ClusterName string `json:"node-name"`
+	// NodeName is the name of the EKS node
+	NodeName string `json:"node-name"`
 	// DevelopMode mode
 	DevelopMode bool `json:"develop-mode"`
 	// Retry interval
@@ -22,7 +22,7 @@ type Config struct {
 func LoadConfig(c *cli.Context) Config {
 	var cfg Config
 	cfg.KubeConfigPath = c.String("kubeconfig")
-	cfg.ClusterName = c.String("node-name")
+	cfg.NodeName = c.String("node-name")
 	cfg.DevelopMode = c.Bool("develop-mode")
 	cfg.RetryInterval = c.Duration("retry-interval")
 	return cfg

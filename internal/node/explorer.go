@@ -18,7 +18,7 @@ const (
 )
 
 type Explorer interface {
-	GetNode(ctx context.Context) (*types.Node, error)
+	GetNode(ctx context.Context, nodeName string) (*types.Node, error)
 }
 
 type explorer struct {
@@ -89,11 +89,14 @@ func getAddresses(addresses []v1.NodeAddress) ([]net.IP, []net.IP, error) {
 }
 
 // GetNode returns the node object
-func (d *explorer) GetNode(ctx context.Context) (*types.Node, error) {
-	// get node name from downward API
-	nodeName, err := getNodeName(podInfoDir + "nodeName")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get node name from downward API")
+func (d *explorer) GetNode(ctx context.Context, nodeName string) (*types.Node, error) {
+	// get node name from downward API if nodeName is empty
+	if nodeName == "" {
+		var err error
+		nodeName, err = getNodeName(podInfoDir + "nodeName")
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get node name from downward API")
+		}
 	}
 
 	// get node object from API server
