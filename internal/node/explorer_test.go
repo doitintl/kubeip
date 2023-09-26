@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"net"
 	"os"
 	"reflect"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/doitintl/kubeip/internal/types"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_getNodeName(t *testing.T) {
@@ -280,6 +284,121 @@ func Test_getAddresses(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("getAddresses() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_explorer_GetNode(t *testing.T) {
+	type fields struct {
+		client kubernetes.Interface
+	}
+	type args struct {
+		nodeName string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *types.Node
+		wantErr bool
+	}{
+		{
+			name: "get node",
+			fields: fields{
+				client: fake.NewSimpleClientset(&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+						Labels: map[string]string{
+							"eks.amazonaws.com/nodegroup":   "test-node-pool",
+							"beta.kubernetes.io/os":         "linux",
+							"topology.kubernetes.io/region": "us-west-2",
+							"topology.kubernetes.io/zone":   "us-west-2b",
+						},
+					},
+					Spec: v1.NodeSpec{
+						ProviderID: "aws:///us-west-2b/i-06d71a5ffc05cc325",
+					},
+					Status: v1.NodeStatus{
+						Addresses: []v1.NodeAddress{
+							{Type: v1.NodeExternalIP, Address: "132.10.10.1"},
+							{Type: v1.NodeInternalIP, Address: "10.10.0.1"},
+						},
+					},
+				}),
+			},
+			args: args{
+				nodeName: "test-node",
+			},
+			want: &types.Node{
+				Name:   "test-node",
+				Cloud:  types.CloudProviderAWS,
+				Pool:   "test-node-pool",
+				Region: "us-west-2",
+				Zone:   "us-west-2b",
+				ExternalIPs: []net.IP{
+					net.ParseIP("132.10.10.1"),
+				},
+				InternalIPs: []net.IP{
+					net.ParseIP("10.10.0.1"),
+				},
+			},
+		},
+		{
+			name: "failed to get region",
+			fields: fields{
+				client: fake.NewSimpleClientset(&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+						Labels: map[string]string{
+							"eks.amazonaws.com/nodegroup": "test-node-pool",
+							"beta.kubernetes.io/os":       "linux",
+						},
+					},
+					Spec: v1.NodeSpec{
+						ProviderID: "aws:///us-west-2b/i-06d71a5ffc05cc325",
+					},
+				}),
+			},
+			args: args{
+				nodeName: "test-node",
+			},
+			wantErr: true,
+		},
+		{
+			name: "failed to get zone",
+			fields: fields{
+				client: fake.NewSimpleClientset(&v1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-node",
+						Labels: map[string]string{
+							"eks.amazonaws.com/nodegroup": "test-node-pool",
+							"beta.kubernetes.io/os":       "linux",
+						},
+					},
+					Spec: v1.NodeSpec{
+						ProviderID: "aws:///us-west-2b/i-06d71a5ffc05cc325",
+					},
+				}),
+			},
+			args: args{
+				nodeName: "test-node",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := &explorer{
+				client: tt.fields.client,
+			}
+			got, err := d.GetNode(context.Background(), tt.args.nodeName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetNode() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetNode() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
