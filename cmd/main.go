@@ -25,7 +25,7 @@ const (
 )
 
 var (
-	version      string
+	version      = "dev"
 	buildDate    string
 	gitCommit    string
 	gitBranch    string
@@ -102,7 +102,7 @@ func run(c context.Context, log *logrus.Entry, cfg config.Config) error {
 		return errors.Wrap(err, "getting node")
 	}
 
-	log.Debug("node name: ", n.Name)
+	log.WithField("node", n).Debug("node details")
 
 	<-ctx.Done()
 	log.Infof("kubeip agent stopped")

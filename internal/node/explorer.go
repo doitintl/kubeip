@@ -75,6 +75,9 @@ func getAddresses(addresses []v1.NodeAddress) ([]net.IP, []net.IP, error) {
 	var externalIPs []net.IP
 	var internalIPs []net.IP
 	for _, address := range addresses {
+		if address.Type != v1.NodeExternalIP && address.Type != v1.NodeInternalIP {
+			continue
+		}
 		ip := net.ParseIP(address.Address)
 		if ip == nil {
 			return nil, nil, errors.Errorf("failed to parse IP address: %s", address.Address)
