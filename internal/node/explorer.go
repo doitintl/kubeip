@@ -53,6 +53,14 @@ func getCloudProvider(providerID string) (types.CloudProvider, error) {
 	return "", errors.Errorf("unsupported cloud provider: %s", providerID)
 }
 
+func getInstance(providerID string) (string, error) {
+	s := strings.Split(providerID, "/")
+	if len(s) < 2 {
+		return "", errors.Errorf("failed to get instance ID")
+	}
+	return s[len(s)-1], nil
+}
+
 func getNodePool(providerID types.CloudProvider, labels map[string]string) (string, error) {
 	var ok bool
 	var pool string
@@ -114,6 +122,12 @@ func (d *explorer) GetNode(ctx context.Context, nodeName string) (*types.Node, e
 		return nil, errors.Wrap(err, "failed to get cloud provider")
 	}
 
+	// get instance ID from provider ID
+	instance, err := getInstance(n.Spec.ProviderID)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get instance ID")
+	}
+
 	// get node region from node labels
 	region, ok := n.Labels["topology.kubernetes.io/region"]
 	if !ok {
@@ -140,6 +154,7 @@ func (d *explorer) GetNode(ctx context.Context, nodeName string) (*types.Node, e
 
 	return &types.Node{
 		Name:        nodeName,
+		Instance:    instance,
 		Cloud:       cloudProvider,
 		Region:      region,
 		Zone:        zone,

@@ -342,11 +342,12 @@ func Test_explorer_GetNode(t *testing.T) {
 				nodeName: "test-node",
 			},
 			want: &types.Node{
-				Name:   "test-node",
-				Cloud:  types.CloudProviderAWS,
-				Pool:   "test-node-pool",
-				Region: "us-west-2",
-				Zone:   "us-west-2b",
+				Name:     "test-node",
+				Instance: "i-06d71a5ffc05cc325",
+				Cloud:    types.CloudProviderAWS,
+				Pool:     "test-node-pool",
+				Region:   "us-west-2",
+				Zone:     "us-west-2b",
 				ExternalIPs: []net.IP{
 					net.ParseIP("132.10.10.1"),
 				},
@@ -410,6 +411,59 @@ func Test_explorer_GetNode(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetNode() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getInstance(t *testing.T) {
+	type args struct {
+		providerID string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "aws",
+			args: args{
+				providerID: "aws:///us-west-2b/i-06d71a5ffc05cc325",
+			},
+			want: "i-06d71a5ffc05cc325",
+		},
+		{
+			name: "azure",
+			args: args{
+				providerID: "azure:///subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/aks-agentpool-12345678-vmss_0",
+			},
+			want: "aks-agentpool-12345678-vmss_0",
+		},
+		{
+			name: "gcp",
+			args: args{
+				providerID: "gce:///projects/123456789012/zones/us-west1-b/instances/gke-cluster-1-default-pool-12345678-0v0v",
+			},
+			want: "gke-cluster-1-default-pool-12345678-0v0v",
+		},
+		{
+			name: "unsupported",
+			args: args{
+				providerID: "unsupported",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getInstance(tt.args.providerID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getInstance() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("getInstance() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

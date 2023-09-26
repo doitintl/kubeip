@@ -12,6 +12,7 @@ const (
 
 type Node struct {
 	Name        string
+	Instance    string
 	Cloud       CloudProvider
 	Pool        string
 	Region      string
