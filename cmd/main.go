@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/doitintl/kubeip/internal/address"
 	"github.com/doitintl/kubeip/internal/config"
 	"github.com/doitintl/kubeip/internal/node"
 	"github.com/pkg/errors"
@@ -76,7 +77,7 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func run(c context.Context, log *logrus.Entry, cfg config.Config) error {
+func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 	// add debug mode to context
@@ -102,7 +103,37 @@ func run(c context.Context, log *logrus.Entry, cfg config.Config) error {
 		return errors.Wrap(err, "getting node")
 	}
 
-	log.WithField("node", n).Debug("node details")
+	// assign static public IP address with retry (interval and attempts)
+	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg)
+	if err != nil {
+		return errors.Wrap(err, "initializing assigner")
+	}
+	// retry counter
+	retryCounter := 0
+	// ticker for retry interval
+	ticker := time.NewTicker(cfg.RetryInterval)
+	defer ticker.Stop()
+	for {
+		err = assigner.Assign(n.Instance, n.Zone, cfg.Filter, cfg.OrderBy)
+		if err != nil {
+			log.WithError(err).Errorf("failed to assign static public IP address to node %s", n.Name)
+			if retryCounter < cfg.RetryAttempts {
+				retryCounter++
+				log.Infof("retrying after %v", cfg.RetryInterval)
+			} else {
+				log.Infof("reached maximum number of retries (%d)", cfg.RetryAttempts)
+				return errors.Wrap(err, "reached maximum number of retries")
+			}
+			select {
+			case <-ticker.C:
+				continue
+			case <-ctx.Done():
+				log.Infof("kubeip agent stopped")
+				return nil
+			}
+		}
+		break
+	}
 
 	<-ctx.Done()
 	log.Infof("kubeip agent stopped")
@@ -134,6 +165,18 @@ func main() {
 						EnvVars:  []string{"NODE_NAME"},
 						Category: "Configuration",
 					},
+					&cli.StringFlag{
+						Name:     "project",
+						Usage:    "name of the GCP project or the AWS account ID (not needed if running in node)",
+						EnvVars:  []string{"PROJECT"},
+						Category: "Configuration",
+					},
+					&cli.StringFlag{
+						Name:     "region",
+						Usage:    "name of the GCP region or the AWS region (not needed if running in node)",
+						EnvVars:  []string{"REGION"},
+						Category: "Configuration",
+					},
 					&cli.PathFlag{
 						Name:     "kubeconfig",
 						Usage:    "path to Kubernetes configuration file (not needed if running in node)",
@@ -145,6 +188,18 @@ func main() {
 						Usage:    "when the agent fails to assign the static public IP address, it will retry after this interval",
 						Value:    defaultRetryInterval,
 						EnvVars:  []string{"RETRY_INTERVAL"},
+						Category: "Configuration",
+					},
+					&cli.StringSliceFlag{
+						Name:     "filter",
+						Usage:    "filter for the IP addresses",
+						EnvVars:  []string{"FILTER"},
+						Category: "Configuration",
+					},
+					&cli.StringFlag{
+						Name:     "order-by",
+						Usage:    "order by for the IP addresses",
+						EnvVars:  []string{"ORDER_BY"},
 						Category: "Configuration",
 					},
 					&cli.IntFlag{
@@ -213,7 +268,7 @@ func kubeConfigFromPath(kubepath string) (*rest.Config, error) {
 	return cfg, nil
 }
 
-func retrieveKubeConfig(log logrus.FieldLogger, cfg config.Config) (*rest.Config, error) {
+func retrieveKubeConfig(log logrus.FieldLogger, cfg *config.Config) (*rest.Config, error) {
 	kubeconfig, err := kubeConfigFromPath(cfg.KubeConfigPath)
 	if err != nil && !errors.Is(err, errEmptyPath) {
 		return nil, errors.Wrap(err, "retrieving kube config from path")
