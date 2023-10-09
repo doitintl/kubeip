@@ -58,6 +58,46 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 				{Name: "test-address-2", Status: "RESERVED", Address: "10.10.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
 			},
 		},
+		{
+			name: "list addresses with multiple pages successfully",
+			fields: fields{
+				project: "test-project",
+				region:  "test-region",
+				listerFn: func(t *testing.T) cloud.Lister {
+					mock := mocks.NewLister(t)
+					mockCall := mocks.NewListCall(t)
+					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (test-filter-1) (test-filter-2)").Return(mockCall)
+					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
+					mockCall.EXPECT().Do().Return(&compute.AddressList{
+						Items: []*compute.Address{
+							{Name: "test-address-1", Status: "RESERVED", Address: "10.10.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+							{Name: "test-address-2", Status: "RESERVED", Address: "10.10.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+						},
+						NextPageToken: "test-next-page-token",
+					}, nil).Once()
+					mockCall.EXPECT().PageToken("test-next-page-token").Return(mockCall)
+					mockCall.EXPECT().Do().Return(&compute.AddressList{
+						Items: []*compute.Address{
+							{Name: "test-address-3", Status: "RESERVED", Address: "10.10.0.3", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+							{Name: "test-address-4", Status: "RESERVED", Address: "10.10.0.4", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+						},
+					}, nil).Once()
+					return mock
+				},
+			},
+			args: args{
+				filter:  []string{"test-filter-1", "test-filter-2"},
+				orderBy: "test-order-by",
+				status:  "RESERVED",
+			},
+			want: []*compute.Address{
+				{Name: "test-address-1", Status: "RESERVED", Address: "10.10.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+				{Name: "test-address-2", Status: "RESERVED", Address: "10.10.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+				{Name: "test-address-3", Status: "RESERVED", Address: "10.10.0.3", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+				{Name: "test-address-4", Status: "RESERVED", Address: "10.10.0.4", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		logger := logrus.NewEntry(logrus.New())
