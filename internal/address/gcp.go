@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
+	"github.com/doitintl/kubeip/internal/cloud"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
@@ -24,6 +25,7 @@ const (
 
 type gcpAssigner struct {
 	client  *compute.Service
+	lister  cloud.Lister
 	project string
 	region  string
 	logger  *logrus.Entry
@@ -58,6 +60,7 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 
 	return &gcpAssigner{
 		client:  client,
+		lister:  cloud.NewLister(client),
 		project: project,
 		region:  region,
 		logger:  logger,
@@ -200,11 +203,13 @@ func (a *gcpAssigner) Assign(instanceID, zone string, filter []string, orderBy s
 }
 
 func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]*compute.Address, error) {
-	call := a.client.Addresses.List(a.project, a.region)
-	var filters []string
-	// filter public addresses (with status)
-	filters = append(filters, fmt.Sprintf("(status=%s)", status))
-	filters = append(filters, "(addressType=EXTERNAL)")
+	call := a.lister.List(a.project, a.region)
+	// Initialize filters with known filters
+	filters := []string{
+		fmt.Sprintf("(status=%s)", status),
+		"(addressType=EXTERNAL)",
+	}
+
 	// filter addresses by provided filter: labels.key=value
 	for _, f := range filter {
 		filters = append(filters, fmt.Sprintf("(%s)", f))
