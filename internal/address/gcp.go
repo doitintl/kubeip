@@ -72,15 +72,10 @@ func (a *gcpAssigner) waitForOperation(op *compute.Operation, zone string, timeo
 		a.logger.Warn("operation is nil")
 		return nil
 	}
-	// Create a context that can be cancelled
-	ctx, cancel := context.WithCancel(context.Background())
+	// Create a context that will be cancelled with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	// Create a timer that cancels the context after timeout
-	timer := time.AfterFunc(timeout, func() {
-		cancel()
-	})
-	defer timer.Stop()
 	var err error
 	name := op.Name
 	for op.Status != operationDone {
