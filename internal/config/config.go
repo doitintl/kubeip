@@ -27,7 +27,7 @@ type Config struct {
 	RetryAttempts int `json:"retry-attempts"`
 }
 
-func LoadConfig(c *cli.Context) *Config {
+func NewConfig(c *cli.Context) *Config {
 	var cfg Config
 	cfg.KubeConfigPath = c.String("kubeconfig")
 	cfg.NodeName = c.String("node-name")

@@ -9,7 +9,8 @@ import (
 
 	"github.com/doitintl/kubeip/internal/address"
 	"github.com/doitintl/kubeip/internal/config"
-	"github.com/doitintl/kubeip/internal/node"
+	nd "github.com/doitintl/kubeip/internal/node"
+	"github.com/doitintl/kubeip/internal/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -77,46 +78,19 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
+func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assigner, node *types.Node, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
-	// add debug mode to context
-	if cfg.DevelopMode {
-		ctx = context.WithValue(ctx, developModeKey, true)
-	}
-
-	log.WithField("develop-mode", cfg.DevelopMode).Infof("kubeip agent started")
-
-	restconfig, err := retrieveKubeConfig(log, cfg)
-	if err != nil {
-		return errors.Wrap(err, "retrieving kube config")
-	}
-
-	clientset, err := kubernetes.NewForConfig(restconfig)
-	if err != nil {
-		return errors.Wrap(err, "initializing kubernetes client")
-	}
-
-	explorer := node.NewExplorer(clientset)
-	n, err := explorer.GetNode(ctx, cfg.NodeName)
-	if err != nil {
-		return errors.Wrap(err, "getting node")
-	}
-
-	// assign static public IP address with retry (interval and attempts)
-	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg)
-	if err != nil {
-		return errors.Wrap(err, "initializing assigner")
-	}
 	// retry counter
 	retryCounter := 0
 	// ticker for retry interval
 	ticker := time.NewTicker(cfg.RetryInterval)
 	defer ticker.Stop()
+
 	for {
-		err = assigner.Assign(n.Instance, n.Zone, cfg.Filter, cfg.OrderBy)
+		err := assigner.Assign(node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
 		if err != nil {
-			log.WithError(err).Errorf("failed to assign static public IP address to node %s", n.Name)
+			log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
 			if retryCounter < cfg.RetryAttempts {
 				retryCounter++
 				log.Infof("retrying after %v", cfg.RetryInterval)
@@ -129,21 +103,69 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 				continue
 			case <-ctx.Done():
 				log.Infof("kubeip agent stopped")
-				return nil
+				return errors.Wrap(err, "context is done")
 			}
 		}
 		break
 	}
+	return nil
+}
 
-	<-ctx.Done()
-	log.Infof("kubeip agent stopped")
+func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
+	ctx, cancel := context.WithCancel(c)
+	defer cancel()
+	// add debug mode to context
+	if cfg.DevelopMode {
+		ctx = context.WithValue(ctx, developModeKey, true)
+	}
+	log.WithField("develop-mode", cfg.DevelopMode).Infof("kubeip agent started")
+
+	restconfig, err := retrieveKubeConfig(log, cfg)
+	if err != nil {
+		return errors.Wrap(err, "retrieving kube config")
+	}
+
+	clientset, err := kubernetes.NewForConfig(restconfig)
+	if err != nil {
+		return errors.Wrap(err, "initializing kubernetes client")
+	}
+
+	explorer := nd.NewExplorer(clientset)
+	n, err := explorer.GetNode(ctx, cfg.NodeName)
+	if err != nil {
+		return errors.Wrap(err, "getting node")
+	}
+
+	// assign static public IP address with retry (interval and attempts)
+	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg)
+	if err != nil {
+		return errors.Wrap(err, "initializing assigner")
+	}
+	// assign static public IP address
+	errorCh := make(chan error)
+	go func() {
+		e := assignAddress(ctx, log, assigner, n, cfg)
+		if e != nil {
+			errorCh <- e
+		}
+	}()
+
+	select {
+	case err = <-errorCh:
+		if err != nil {
+			return errors.Wrap(err, "assigning static public IP address")
+		}
+	case <-ctx.Done():
+		log.Infof("kubeip agent stopped")
+	}
+
 	return nil
 }
 
 func runCmd(c *cli.Context) error {
 	ctx := signals.SetupSignalHandler()
 	log := prepareLogger(c.String("log-level"), c.Bool("json"))
-	cfg := config.LoadConfig(c)
+	cfg := config.NewConfig(c)
 
 	if err := run(ctx, log, cfg); err != nil {
 		log.Fatalf("eks-lens agent failed: %v", err)

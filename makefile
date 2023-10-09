@@ -7,6 +7,7 @@ GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOTOOL=$(GOCMD) tool
 GOLINT=golangci-lint
+GOMOCK=mockery
 LINT_CONFIG = $(CURDIR)/.golangci.yaml
 
 BIN=$(CURDIR)/.bin
@@ -38,6 +39,8 @@ all: lint test build ; $(info $(M) build, test and deploy ...) @ ## release cycl
 # Tools
 setup-lint:
 	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+setup-mockery:
+	$(GOCMD) install github.com/vektra/mockery/v2@v2.35.2
 
 # Tasks
 
@@ -50,6 +53,9 @@ lint: setup-lint; $(info $(M) running golangci-lint ...) @ ## run golangci-lint 
 	# updating path since golangci-lint is looking for go binary and this may lead to
 	# conflict when multiple go versions are installed
 	$Q $(GOLINT) run -v -c $(LINT_CONFIG) --out-format checkstyle ./... > golangci-lint.out
+
+mock: setup-mockery ; $(info $(M) running mockery ...) @ ## run mockery to generate mocks
+	$Q $(GOMOCK) --dir internal --all --keeptree --with-expecter
 
 test: ; $(info $(M) running test ...) @ ## run tests with coverage
 	$Q $(GOCMD) fmt ./...
