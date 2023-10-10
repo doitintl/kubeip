@@ -16,6 +16,11 @@ import (
 const (
 	minProviderIDTokens = 2
 	podInfoDir          = "/etc/podinfo/"
+	awsPoolLabel        = "eks.amazonaws.com/nodegroup"
+	azurePoolLabel      = "node.kubernetes.io/instancegroup"
+	gcpPoolLabel        = "cloud.google.com/gke-nodepool"
+	regionLabel         = "topology.kubernetes.io/region"
+	zoneLabel           = "topology.kubernetes.io/zone"
 )
 
 type Explorer interface {
@@ -66,11 +71,11 @@ func getNodePool(providerID types.CloudProvider, labels map[string]string) (stri
 	var ok bool
 	var pool string
 	if providerID == types.CloudProviderAWS {
-		pool, ok = labels["eks.amazonaws.com/nodegroup"]
+		pool, ok = labels[awsPoolLabel]
 	} else if providerID == types.CloudProviderAzure {
-		pool, ok = labels["node.kubernetes.io/instancegroup"]
+		pool, ok = labels[azurePoolLabel]
 	} else if providerID == types.CloudProviderGCP {
-		pool, ok = labels["cloud.google.com/gke-nodepool"]
+		pool, ok = labels[gcpPoolLabel]
 	} else {
 		return "", errors.Errorf("unsupported cloud provider: %s", providerID)
 	}
@@ -130,13 +135,13 @@ func (d *explorer) GetNode(ctx context.Context, nodeName string) (*types.Node, e
 	}
 
 	// get node region from node labels
-	region, ok := n.Labels["topology.kubernetes.io/region"]
+	region, ok := n.Labels[regionLabel]
 	if !ok {
 		return nil, errors.Errorf("failed to get node region")
 	}
 
 	// get node zone from node labels
-	zone, ok := n.Labels["topology.kubernetes.io/zone"]
+	zone, ok := n.Labels[zoneLabel]
 	if !ok {
 		return nil, errors.Errorf("failed to get node zone")
 	}

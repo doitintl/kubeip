@@ -1,12 +1,16 @@
 package address
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/doitintl/kubeip/internal/cloud"
 	mocks "github.com/doitintl/kubeip/mocks/cloud"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	tmock "github.com/stretchr/testify/mock"
 	"google.golang.org/api/compute/v1"
 )
 
@@ -115,6 +119,139 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("listAddresses() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_gcpAssigner_waitForOperation(t *testing.T) {
+	type fields struct {
+		waiterFn func(t *testing.T) cloud.ZoneWaiter
+		project  string
+		logger   *logrus.Entry
+	}
+	type args struct {
+		op      *compute.Operation
+		zone    string
+		timeout time.Duration
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "wait for operation successfully",
+			fields: fields{
+				project: "test-project",
+				waiterFn: func(t *testing.T) cloud.ZoneWaiter {
+					mock := mocks.NewZoneWaiter(t)
+					mockCall := mocks.NewWaitCall(t)
+					mock.EXPECT().Wait("test-project", "test-zone", "test-operation").Return(mockCall)
+					mockCall.EXPECT().Context(tmock.Anything).Return(mockCall)
+					mockCall.EXPECT().Do().Return(&compute.Operation{Status: "DONE"}, nil)
+					return mock
+				},
+			},
+			args: args{
+				op:      &compute.Operation{Name: "test-operation", Status: "RUNNING"},
+				zone:    "test-zone",
+				timeout: time.Millisecond,
+			},
+		},
+		{
+			name: "wait for operation with a few retries successfully",
+			fields: fields{
+				project: "test-project",
+				waiterFn: func(t *testing.T) cloud.ZoneWaiter {
+					mock := mocks.NewZoneWaiter(t)
+					mockCall := mocks.NewWaitCall(t)
+					mock.EXPECT().Wait("test-project", "test-zone", "test-operation").Return(mockCall)
+					mockCall.EXPECT().Context(tmock.Anything).Return(mockCall)
+					mockCall.EXPECT().Do().Return(&compute.Operation{Status: "RUNNING"}, nil).Times(2)
+					mockCall.EXPECT().Do().Return(&compute.Operation{Status: "DONE"}, nil)
+					return mock
+				},
+			},
+			args: args{
+				op:      &compute.Operation{Name: "test-operation", Status: "RUNNING"},
+				zone:    "test-zone",
+				timeout: time.Millisecond * 2,
+			},
+		},
+		{
+			name: "wait for operation with timeout",
+			fields: fields{
+				project: "test-project",
+				waiterFn: func(t *testing.T) cloud.ZoneWaiter {
+					mock := mocks.NewZoneWaiter(t)
+					mockCall := mocks.NewWaitCall(t)
+					mock.EXPECT().Wait("test-project", "test-zone", "test-operation").Return(mockCall)
+					mockCall.EXPECT().Context(tmock.Anything).Return(mockCall)
+					mockCall.EXPECT().Do().Return(nil, context.Canceled)
+					return mock
+				},
+			},
+			args: args{
+				op:      &compute.Operation{Name: "test-operation", Status: "RUNNING"},
+				zone:    "test-zone",
+				timeout: time.Millisecond,
+			},
+			wantErr: true,
+		},
+		{
+			name: "wait for operation with error",
+			fields: fields{
+				project: "test-project",
+				waiterFn: func(t *testing.T) cloud.ZoneWaiter {
+					mock := mocks.NewZoneWaiter(t)
+					mockCall := mocks.NewWaitCall(t)
+					mock.EXPECT().Wait("test-project", "test-zone", "test-operation").Return(mockCall)
+					mockCall.EXPECT().Context(tmock.Anything).Return(mockCall)
+					mockCall.EXPECT().Do().Return(nil, errors.New("test-error"))
+					return mock
+				},
+			},
+			args: args{
+				op:      &compute.Operation{Name: "test-operation", Status: "RUNNING"},
+				zone:    "test-zone",
+				timeout: time.Millisecond,
+			},
+			wantErr: true,
+		},
+		{
+			name: "wait for operation with error in operation",
+			fields: fields{
+				project: "test-project",
+				waiterFn: func(t *testing.T) cloud.ZoneWaiter {
+					mock := mocks.NewZoneWaiter(t)
+					mockCall := mocks.NewWaitCall(t)
+					mock.EXPECT().Wait("test-project", "test-zone", "test-operation").Return(mockCall)
+					mockCall.EXPECT().Context(tmock.Anything).Return(mockCall)
+					mockCall.EXPECT().Do().Return(&compute.Operation{Status: "DONE", Error: &compute.OperationError{Errors: []*compute.OperationErrorErrors{{Code: "123", Message: "test-error"}}}}, nil)
+					return mock
+				},
+			},
+			args: args{
+				op:      &compute.Operation{Name: "test-operation", Status: "RUNNING"},
+				zone:    "test-zone",
+				timeout: time.Millisecond,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logrus.NewEntry(logrus.New())
+			waiter := tt.fields.waiterFn(t)
+			a := &gcpAssigner{
+				waiter:  waiter,
+				project: tt.fields.project,
+				logger:  logger,
+			}
+			if err := a.waitForOperation(tt.args.op, tt.args.zone, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("waitForOperation() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
