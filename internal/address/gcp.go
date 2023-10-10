@@ -24,11 +24,13 @@ const (
 )
 
 type gcpAssigner struct {
-	client  *compute.Service
-	lister  cloud.Lister
-	project string
-	region  string
-	logger  *logrus.Entry
+	lister         cloud.Lister
+	waiter         cloud.ZoneWaiter
+	addressManager cloud.AddressManager
+	instanceGetter cloud.InstanceGetter
+	project        string
+	region         string
+	logger         *logrus.Entry
 }
 
 func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region string) (Assigner, error) {
@@ -59,11 +61,13 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 	}
 
 	return &gcpAssigner{
-		client:  client,
-		lister:  cloud.NewLister(client),
-		project: project,
-		region:  region,
-		logger:  logger,
+		lister:         cloud.NewLister(client),
+		waiter:         cloud.NewZoneWaiter(client),
+		addressManager: cloud.NewAddressManager(client),
+		instanceGetter: cloud.NewInstanceGetter(client),
+		project:        project,
+		region:         region,
+		logger:         logger,
 	}, nil
 }
 
@@ -80,7 +84,7 @@ func (a *gcpAssigner) waitForOperation(op *compute.Operation, zone string, timeo
 	name := op.Name
 	for op.Status != operationDone {
 		// Pass the cancellable context to the Wait method
-		op, err = a.client.ZoneOperations.Wait(a.project, zone, name).Context(ctx).Do()
+		op, err = a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
 		if err != nil {
 			// If the context was cancelled, return a timeout error
 			if errors.Is(err, context.Canceled) {
@@ -117,7 +121,7 @@ func (a *gcpAssigner) deleteInstanceAddress(instance *compute.Instance, zone str
 		"instance": instance.Name,
 		"address":  accessConfig.NatIP,
 	}).Infof("deleting ephemeral public IP address from instance")
-	op, err := a.client.Instances.DeleteAccessConfig(a.project, zone, instance.Name, accessConfigName, networkInterface.Name).Do()
+	op, err := a.addressManager.DeleteAccessConfig(a.project, zone, instance.Name, accessConfigName, networkInterface.Name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete access config %s from instance %s", accessConfigName, instance.Name)
 	}
@@ -134,12 +138,12 @@ func (a *gcpAssigner) addInstanceAddress(instance *compute.Instance, zone string
 		"instance": instance.Name,
 		"address":  address.Address,
 	}).Infof("adding reserved public IP address to instance")
-	op, err := a.client.Instances.AddAccessConfig(a.project, zone, instance.Name, defaultNetworkInterface, &compute.AccessConfig{
+	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, defaultNetworkInterface, &compute.AccessConfig{
 		Name:  address.Name,
 		Type:  accessConfigType,
 		Kind:  accessConfigKind,
 		NatIP: address.Address,
-	}).Do()
+	})
 	if err != nil {
 		return errors.Wrapf(err, "failed to add access config %s to instance %s", address.Name, instance.Name)
 	}
@@ -152,7 +156,7 @@ func (a *gcpAssigner) addInstanceAddress(instance *compute.Instance, zone string
 
 func (a *gcpAssigner) Assign(instanceID, zone string, filter []string, orderBy string) error {
 	// check if instance already has a public static IP address assigned
-	instance, err := a.client.Instances.Get(a.project, zone, instanceID).Do()
+	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to get instance %s", instanceID)
 	}

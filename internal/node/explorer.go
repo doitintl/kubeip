@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	podInfoDir = "/etc/podinfo/"
+	minProviderIDTokens = 2
+	podInfoDir          = "/etc/podinfo/"
 )
 
 type Explorer interface {
@@ -55,7 +56,7 @@ func getCloudProvider(providerID string) (types.CloudProvider, error) {
 
 func getInstance(providerID string) (string, error) {
 	s := strings.Split(providerID, "/")
-	if len(s) < 2 {
+	if len(s) < minProviderIDTokens {
 		return "", errors.Errorf("failed to get instance ID")
 	}
 	return s[len(s)-1], nil
