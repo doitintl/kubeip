@@ -88,7 +88,7 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 	defer ticker.Stop()
 
 	for {
-		err := assigner.Assign(node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
+		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
 		if err != nil {
 			log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
 			if retryCounter < cfg.RetryAttempts {
@@ -176,6 +176,9 @@ func runCmd(c *cli.Context) error {
 
 func main() {
 	app := &cli.App{
+		// use ";" instead of "," for slice flag separator
+		// AWS filter values can contain "," and shorthand filter format uses "," to separate Names and Values
+		SliceFlagSeparator: ";",
 		Commands: []*cli.Command{
 			{
 				Name:  "run",

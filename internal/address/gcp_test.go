@@ -250,7 +250,7 @@ func Test_gcpAssigner_waitForOperation(t *testing.T) {
 				project: tt.fields.project,
 				logger:  logger,
 			}
-			if err := a.waitForOperation(tt.args.op, tt.args.zone, tt.args.timeout); (err != nil) != tt.wantErr {
+			if err := a.waitForOperation(context.TODO(), tt.args.op, tt.args.zone, tt.args.timeout); (err != nil) != tt.wantErr {
 				t.Errorf("waitForOperation() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

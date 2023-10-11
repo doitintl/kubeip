@@ -71,13 +71,13 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 	}, nil
 }
 
-func (a *gcpAssigner) waitForOperation(op *compute.Operation, zone string, timeout time.Duration) error {
+func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation, zone string, timeout time.Duration) error {
 	if op == nil {
 		a.logger.Warn("operation is nil")
 		return nil
 	}
 	// Create a context that will be cancelled with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(c, timeout)
 	defer cancel()
 
 	var err error
@@ -100,7 +100,7 @@ func (a *gcpAssigner) waitForOperation(op *compute.Operation, zone string, timeo
 	return nil
 }
 
-func (a *gcpAssigner) deleteInstanceAddress(instance *compute.Instance, zone string) error {
+func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compute.Instance, zone string) error {
 	// Check if the instance has at least one network interface
 	if len(instance.NetworkInterfaces) == 0 {
 		a.logger.WithField("instance", instance.Name).Info("instance has no network interfaces")
@@ -126,13 +126,13 @@ func (a *gcpAssigner) deleteInstanceAddress(instance *compute.Instance, zone str
 		return errors.Wrapf(err, "failed to delete access config %s from instance %s", accessConfigName, instance.Name)
 	}
 	// wait for operation to complete
-	if err = a.waitForOperation(op, zone, defaultTimeout); err != nil {
+	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
 		return errors.Wrapf(err, "failed to wait for operation %s", op.Name)
 	}
 	return nil
 }
 
-func (a *gcpAssigner) addInstanceAddress(instance *compute.Instance, zone string, address *compute.Address) error {
+func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error {
 	// add instance network interface access config
 	a.logger.WithFields(logrus.Fields{
 		"instance": instance.Name,
@@ -148,13 +148,13 @@ func (a *gcpAssigner) addInstanceAddress(instance *compute.Instance, zone string
 		return errors.Wrapf(err, "failed to add access config %s to instance %s", address.Name, instance.Name)
 	}
 	// wait for operation to complete
-	if err = a.waitForOperation(op, zone, defaultTimeout); err != nil {
+	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
 		return errors.Wrapf(err, "failed to wait for operation %s", op.Name)
 	}
 	return nil
 }
 
-func (a *gcpAssigner) Assign(instanceID, zone string, filter []string, orderBy string) error {
+func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
 	// check if instance already has a public static IP address assigned
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
@@ -188,13 +188,13 @@ func (a *gcpAssigner) Assign(instanceID, zone string, filter []string, orderBy s
 	}
 
 	// delete current ephemeral public IP address
-	if err = a.deleteInstanceAddress(instance, zone); err != nil {
+	if err = a.deleteInstanceAddress(ctx, instance, zone); err != nil {
 		return errors.Wrap(err, "failed to delete current public IP address")
 	}
 
 	// assign first available static public IP address to the instance
 	address := addresses[0]
-	if err = a.addInstanceAddress(instance, zone, address); err != nil {
+	if err = a.addInstanceAddress(ctx, instance, zone, address); err != nil {
 		return errors.Wrap(err, "failed to assign static public IP address")
 	}
 

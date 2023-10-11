@@ -9,7 +9,7 @@ import (
 )
 
 type Assigner interface {
-	Assign(instanceID, zone string, filter []string, orderBy string) error
+	Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error
 }
 
 type assigner struct {
@@ -17,7 +17,7 @@ type assigner struct {
 
 func NewAssigner(ctx context.Context, logger *logrus.Entry, provider types.CloudProvider, cfg *config.Config) (Assigner, error) {
 	if provider == types.CloudProviderAWS {
-		return &awsAssigner{}, nil
+		return NewAwsAssigner(ctx, logger, cfg.Region)
 	} else if provider == types.CloudProviderAzure {
 		return &azureAssigner{}, nil
 	} else if provider == types.CloudProviderGCP {
@@ -26,6 +26,6 @@ func NewAssigner(ctx context.Context, logger *logrus.Entry, provider types.Cloud
 	return &assigner{}, nil
 }
 
-func (a *assigner) Assign(_, _ string, _ []string, _ string) error {
+func (a *assigner) Assign(_ context.Context, _, _ string, _ []string, _ string) error {
 	return nil
 }

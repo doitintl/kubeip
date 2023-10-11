@@ -10,6 +10,7 @@ import (
 	"github.com/doitintl/kubeip/internal/types"
 	mocks "github.com/doitintl/kubeip/mocks/address"
 	"github.com/pkg/errors"
+	tmock "github.com/stretchr/testify/mock"
 )
 
 func Test_assignAddress(t *testing.T) {
@@ -30,7 +31,7 @@ func Test_assignAddress(t *testing.T) {
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil)
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil)
 					return mock
 				},
 				node: &types.Node{
@@ -53,9 +54,9 @@ func Test_assignAddress(t *testing.T) {
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("first error")).Once()
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("second error")).Once()
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("first error")).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("second error")).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil).Once()
 					return mock
 				},
 				node: &types.Node{
@@ -78,7 +79,7 @@ func Test_assignAddress(t *testing.T) {
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Times(4)
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Times(4)
 					return mock
 				},
 				node: &types.Node{
@@ -105,7 +106,7 @@ func Test_assignAddress(t *testing.T) {
 				}(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign("test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Maybe()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Maybe()
 					return mock
 				},
 				node: &types.Node{
