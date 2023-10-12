@@ -1,11 +1,16 @@
 package address
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/doitintl/kubeip/internal/cloud"
+	mocks "github.com/doitintl/kubeip/mocks/cloud"
+	"github.com/sirupsen/logrus"
+	tmock "github.com/stretchr/testify/mock"
 )
 
 func Test_sortAddressesByTag(t *testing.T) {
@@ -411,6 +416,154 @@ func Test_sortAddressesByField(t *testing.T) {
 			sortAddressesByField(tt.args.addresses, tt.args.sortBy)
 			if !reflect.DeepEqual(tt.args.addresses, tt.want) {
 				t.Errorf("sortAddressesByField() = %v, want %v", tt.args.addresses, tt.want)
+			}
+		})
+	}
+}
+
+func Test_awsAssigner_Assign(t *testing.T) {
+	type args struct {
+		ctx        context.Context
+		instanceID string
+		filter     []string
+		orderBy    string
+	}
+	type fields struct {
+		region           string
+		logger           *logrus.Entry
+		instanceGetterFn func(t *testing.T, args *args) cloud.Ec2InstanceGetter
+		eipListerFn      func(t *testing.T, args *args) cloud.EipLister
+		eipAssignerFn    func(t *testing.T, args *args) cloud.EipAssigner
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "assign EIP to instance",
+			fields: fields{
+				region: "us-east-1",
+				logger: logrus.NewEntry(logrus.New()),
+				instanceGetterFn: func(t *testing.T, args *args) cloud.Ec2InstanceGetter {
+					mock := mocks.NewEc2InstanceGetter(t)
+					mock.EXPECT().Get(args.ctx, args.instanceID, "us-east-1").Return(&types.Instance{
+						InstanceId: aws.String(args.instanceID),
+						NetworkInterfaces: []types.InstanceNetworkInterface{
+							{
+								Association: &types.InstanceNetworkInterfaceAssociation{
+									PublicIp: aws.String("135.64.10.1"),
+								},
+								NetworkInterfaceId: aws.String("eni-0abcd1234efgh5678"),
+							},
+						},
+					}, nil)
+					return mock
+				},
+				eipListerFn: func(t *testing.T, args *args) cloud.EipLister {
+					mock := mocks.NewEipLister(t)
+					mock.EXPECT().List(args.ctx, map[string][]string{
+						"instance-id": {args.instanceID},
+					}, true).Return([]types.Address{}, nil).Once()
+					mock.EXPECT().List(args.ctx, map[string][]string{
+						"tag:env":    {"test"},
+						"tag:kubeip": {"reserved"},
+					}, false).Return([]types.Address{
+						{
+							AllocationId: aws.String("eipalloc-0abcd1234efgh5678"),
+							PublicIp:     aws.String("100.0.0.1"),
+							Tags: []types.Tag{
+								{
+									Key:   aws.String("env"),
+									Value: aws.String("test"),
+								},
+								{
+									Key:   aws.String("kubeip"),
+									Value: aws.String("reserved"),
+								},
+							},
+						},
+						{
+							AllocationId: aws.String("eipalloc-0abcd1234efgh5679"),
+							PublicIp:     aws.String("100.0.0.2"),
+							Tags: []types.Tag{
+								{
+									Key:   aws.String("env"),
+									Value: aws.String("test"),
+								},
+								{
+									Key:   aws.String("kubeip"),
+									Value: aws.String("reserved"),
+								},
+							},
+						},
+					}, nil).Once()
+					return mock
+				},
+				eipAssignerFn: func(t *testing.T, args *args) cloud.EipAssigner {
+					mock := mocks.NewEipAssigner(t)
+					mock.EXPECT().Assign(args.ctx, args.instanceID, "eni-0abcd1234efgh5678", tmock.Anything).Return(nil)
+					return mock
+				},
+			},
+			args: args{
+				ctx:        context.Background(),
+				instanceID: "i-0abcd1234efgh5678",
+				filter: []string{
+					"Name=tag:env,Values=test",
+					"Name=tag:kubeip,Values=reserved",
+				},
+				orderBy: "PublicIp",
+			},
+		},
+		{
+			name: "instance already has EIP assigned",
+			fields: fields{
+				region: "us-east-1",
+				logger: logrus.NewEntry(logrus.New()),
+				instanceGetterFn: func(t *testing.T, args *args) cloud.Ec2InstanceGetter {
+					return nil
+				},
+				eipAssignerFn: func(t *testing.T, args *args) cloud.EipAssigner {
+					return nil
+				},
+				eipListerFn: func(t *testing.T, args *args) cloud.EipLister {
+					mock := mocks.NewEipLister(t)
+					mock.EXPECT().List(args.ctx, map[string][]string{
+						"instance-id": {args.instanceID},
+					}, true).Return([]types.Address{
+						{
+							AllocationId: aws.String("eipalloc-0abcd1234efgh5678"),
+							PublicIp:     aws.String("100.0.0.1"),
+							Tags: []types.Tag{
+								{
+									Key:   aws.String("env"),
+									Value: aws.String("test"),
+								},
+							},
+						},
+					}, nil)
+					return mock
+				},
+			},
+			args: args{
+				ctx:        context.Background(),
+				instanceID: "i-0abcd1234efgh5678",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &awsAssigner{
+				region:         tt.fields.region,
+				logger:         tt.fields.logger,
+				instanceGetter: tt.fields.instanceGetterFn(t, &tt.args),
+				eipLister:      tt.fields.eipListerFn(t, &tt.args),
+				eipAssigner:    tt.fields.eipAssignerFn(t, &tt.args),
+			}
+			if err := a.Assign(tt.args.ctx, tt.args.instanceID, "", tt.args.filter, tt.args.orderBy); (err != nil) != tt.wantErr {
+				t.Errorf("Assign() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
