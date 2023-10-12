@@ -256,3 +256,168 @@ func Test_gcpAssigner_waitForOperation(t *testing.T) {
 		})
 	}
 }
+
+func Test_gcpAssigner_deleteInstanceAddress(t *testing.T) {
+	type args struct {
+		ctx      context.Context
+		instance *compute.Instance
+		zone     string
+	}
+	type fields struct {
+		addressManagerFn func(t *testing.T, args *args) cloud.AddressManager
+		project          string
+		region           string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "delete instance address successfully",
+			fields: fields{
+				project: "test-project",
+				region:  "test-region",
+				addressManagerFn: func(t *testing.T, args *args) cloud.AddressManager {
+					mock := mocks.NewAddressManager(t)
+					networkInterfaceName := args.instance.NetworkInterfaces[0].Name
+					accessConfigName := args.instance.NetworkInterfaces[0].AccessConfigs[0].Name
+					mock.EXPECT().DeleteAccessConfig("test-project", "", args.instance.Name, accessConfigName, networkInterfaceName).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					return mock
+				},
+			},
+			args: args{
+				ctx: context.TODO(),
+				instance: &compute.Instance{
+					Name: "test-instance",
+					Zone: "test-zone",
+					NetworkInterfaces: []*compute.NetworkInterface{
+						{
+							Name: "test-network-interface",
+							AccessConfigs: []*compute.AccessConfig{
+								{Name: "test-access-config", NatIP: "100.0.0.1"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logrus.NewEntry(logrus.New())
+			a := &gcpAssigner{
+				addressManager: tt.fields.addressManagerFn(t, &tt.args),
+				project:        tt.fields.project,
+				region:         tt.fields.region,
+				logger:         logger,
+			}
+			if err := a.deleteInstanceAddress(tt.args.ctx, tt.args.instance, tt.args.zone); (err != nil) != tt.wantErr {
+				t.Errorf("deleteInstanceAddress() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_gcpAssigner_Assign(t *testing.T) {
+	type fields struct {
+		listerFn         func(t *testing.T) cloud.Lister
+		addressManagerFn func(t *testing.T) cloud.AddressManager
+		instanceGetterFn func(t *testing.T) cloud.InstanceGetter
+		project          string
+		region           string
+	}
+	type args struct {
+		ctx        context.Context
+		instanceID string
+		zone       string
+		filter     []string
+		orderBy    string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "assign address successfully",
+			fields: fields{
+				project: "test-project",
+				region:  "test-region",
+				listerFn: func(t *testing.T) cloud.Lister {
+					mock := mocks.NewLister(t)
+					mockCall := mocks.NewListCall(t)
+					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL)").Return(mockCall).Once()
+					mockCall.EXPECT().Do().Return(&compute.AddressList{
+						Items: []*compute.Address{
+							{Name: "test-address-1", Status: inUseStatus, Address: "100.0.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-1"}},
+							{Name: "test-address-2", Status: inUseStatus, Address: "100.0.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-2"}},
+						},
+					}, nil).Once()
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
+					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall).Once()
+					mockCall.EXPECT().Do().Return(&compute.AddressList{
+						Items: []*compute.Address{
+							{Name: "test-address-3", Status: reservedStatus, Address: "100.0.0.3", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+							{Name: "test-address-4", Status: reservedStatus, Address: "100.0.0.4", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+						},
+					}, nil).Once()
+					return mock
+				},
+				instanceGetterFn: func(t *testing.T) cloud.InstanceGetter {
+					mock := mocks.NewInstanceGetter(t)
+					mock.EXPECT().Get("test-project", "test-zone", "test-instance-0").Return(&compute.Instance{
+						Name: "test-instance-0",
+						Zone: "test-zone",
+						NetworkInterfaces: []*compute.NetworkInterface{
+							{
+								Name: "test-network-interface",
+								AccessConfigs: []*compute.AccessConfig{
+									{Name: "test-access-config", NatIP: "200.0.0.1", Type: accessConfigType, Kind: accessConfigKind},
+								},
+							},
+						},
+					}, nil)
+					return mock
+				},
+				addressManagerFn: func(t *testing.T) cloud.AddressManager {
+					mock := mocks.NewAddressManager(t)
+					mock.EXPECT().DeleteAccessConfig("test-project", "test-zone", "test-instance-0", "test-access-config", "test-network-interface").Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					mock.EXPECT().AddAccessConfig("test-project", "test-zone", "test-instance-0", defaultNetworkInterface, &compute.AccessConfig{
+						Name:  "test-address-3",
+						Type:  accessConfigType,
+						Kind:  accessConfigKind,
+						NatIP: "100.0.0.3",
+					}).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					return mock
+				},
+			},
+			args: args{
+				ctx:        context.TODO(),
+				instanceID: "test-instance-0",
+				zone:       "test-zone",
+				filter:     []string{"test-filter-1", "test-filter-2"},
+				orderBy:    "test-order-by",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logrus.NewEntry(logrus.New())
+			a := &gcpAssigner{
+				lister:         tt.fields.listerFn(t),
+				addressManager: tt.fields.addressManagerFn(t),
+				instanceGetter: tt.fields.instanceGetterFn(t),
+				project:        tt.fields.project,
+				region:         tt.fields.region,
+				logger:         logger,
+			}
+			if err := a.Assign(tt.args.ctx, tt.args.instanceID, tt.args.zone, tt.args.filter, tt.args.orderBy); (err != nil) != tt.wantErr {
+				t.Errorf("Assign() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
