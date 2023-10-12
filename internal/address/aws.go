@@ -76,30 +76,34 @@ func parseShorthandFilter(filter string) (string, []string, error) {
 	return name[1], listValues, nil
 }
 
+func sortAddressesByTag(addresses []types.Address, key string) {
+	sort.Slice(addresses, func(i, j int) bool {
+		if addresses[i].Tags == nil {
+			return false
+		}
+		if addresses[j].Tags == nil {
+			return true
+		}
+		for _, tag := range addresses[i].Tags {
+			if *tag.Key == key {
+				for _, tag2 := range addresses[j].Tags {
+					if *tag2.Key == key {
+						return *tag.Value < *tag2.Value
+					}
+				}
+			}
+		}
+		return false
+	})
+}
+
 // sortAddressesByField sorts addresses by the given field
 // if sortBy is Tag:<key>, sort addresses by tag value
 func sortAddressesByField(addresses []types.Address, sortBy string) {
 	// if sortBy is Tag:<key>, sort addresses by tag value
 	if strings.HasPrefix(sortBy, "Tag:") {
 		key := strings.TrimPrefix(sortBy, "Tag:")
-		sort.Slice(addresses, func(i, j int) bool {
-			if addresses[i].Tags == nil {
-				return false
-			}
-			if addresses[j].Tags == nil {
-				return true
-			}
-			for _, tag := range addresses[i].Tags {
-				if *tag.Key == key {
-					for _, tag2 := range addresses[j].Tags {
-						if *tag2.Key == key {
-							return *tag.Value < *tag2.Value
-						}
-					}
-				}
-			}
-			return false
-		})
+		sortAddressesByTag(addresses, key)
 		return // return if sortBy is Tag:<key>
 	}
 	// sort addresses by orderBy field
@@ -143,7 +147,7 @@ func sortAddressesByField(addresses []types.Address, sortBy string) {
 	}
 }
 
-func (a *awsAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
+func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) error {
 	// get elastic IP attached to the instance
 	filters := make(map[string][]string)
 	filters["instance-id"] = []string{instanceID}
