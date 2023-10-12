@@ -9,6 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	ErrUnknownCloudProvider = errors.New("unknown cloud provider")
+)
+
 type Assigner interface {
 	Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error
 	Unassign(ctx context.Context, instanceID, zone string) error
@@ -22,5 +26,5 @@ func NewAssigner(ctx context.Context, logger *logrus.Entry, provider types.Cloud
 	} else if provider == types.CloudProviderGCP {
 		return NewGCPAssigner(ctx, logger, cfg.Project, cfg.Region)
 	}
-	return nil, errors.New("unknown cloud provider")
+	return nil, ErrUnknownCloudProvider
 }

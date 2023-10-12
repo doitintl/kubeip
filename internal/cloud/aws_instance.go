@@ -2,10 +2,10 @@ package cloud
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/pkg/errors"
 )
 
 type Ec2InstanceGetter interface {
@@ -29,11 +29,11 @@ func (g *ec2InstanceGetter) Get(ctx context.Context, instanceID, region string) 
 
 	resp, err := g.client.DescribeInstances(ctx, input)
 	if err != nil {
-		return nil, fmt.Errorf("failed to describe instances, %v", err)
+		return nil, errors.Wrap(err, "failed to describe instances, %v")
 	}
 
 	if len(resp.Reservations) == 0 || len(resp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf("no instances found for the given id")
+		return nil, errors.Wrap(err, "no instances found for the given id")
 	}
 
 	return &resp.Reservations[0].Instances[0], nil
