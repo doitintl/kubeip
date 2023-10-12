@@ -215,3 +215,30 @@ func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter [
 
 	return nil
 }
+
+func (a *awsAssigner) Unassign(ctx context.Context, instanceID, _ string) error {
+	// get elastic IP attached to the instance
+	filters := make(map[string][]string)
+	filters["instance-id"] = []string{instanceID}
+	addresses, err := a.eipLister.List(ctx, filters, true)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list elastic IPs attached to instance %s", instanceID)
+	}
+	if len(addresses) == 0 {
+		a.logger.Infof("no elastic IP attached to instance %s", instanceID)
+		return nil
+	}
+
+	// unassign elastic IP from the instance
+	address := addresses[0]
+	if err = a.eipAssigner.Unassign(ctx, &address); err != nil {
+		return errors.Wrap(err, "failed to unassign elastic IP")
+	}
+	a.logger.WithFields(logrus.Fields{
+		"instance":      instanceID,
+		"address":       *address.PublicIp,
+		"allocation_id": *address.AllocationId,
+	}).Info("elastic IP unassigned from the instance")
+
+	return nil
+}

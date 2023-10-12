@@ -11,6 +11,7 @@ import (
 
 type Assigner interface {
 	Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error
+	Unassign(ctx context.Context, instanceID, zone string) error
 }
 
 func NewAssigner(ctx context.Context, logger *logrus.Entry, provider types.CloudProvider, cfg *config.Config) (Assigner, error) {

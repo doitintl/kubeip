@@ -10,6 +10,7 @@ import (
 
 type EipAssigner interface {
 	Assign(ctx context.Context, region, instanceID string, address *types.Address) error
+	Unassign(ctx context.Context, address *types.Address) error
 }
 
 type eipAssigner struct {
@@ -31,6 +32,20 @@ func (a *eipAssigner) Assign(ctx context.Context, instanceID, networkInterfaceID
 	_, err := a.client.AssociateAddress(ctx, input)
 	if err != nil {
 		return errors.Wrap(err, "failed to associate elastic IP with the instance")
+	}
+
+	return nil
+}
+
+func (a *eipAssigner) Unassign(ctx context.Context, address *types.Address) error {
+	// disassociate elastic IP from the instance
+	input := &ec2.DisassociateAddressInput{
+		AssociationId: address.AssociationId,
+	}
+
+	_, err := a.client.DisassociateAddress(ctx, input)
+	if err != nil {
+		return errors.Wrap(err, "failed to disassociate elastic IP from the instance")
 	}
 
 	return nil

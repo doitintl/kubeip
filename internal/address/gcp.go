@@ -120,7 +120,7 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 	a.logger.WithFields(logrus.Fields{
 		"instance": instance.Name,
 		"address":  accessConfig.NatIP,
-	}).Infof("deleting ephemeral public IP address from instance")
+	}).Infof("deleting public IP address from instance")
 	op, err := a.addressManager.DeleteAccessConfig(a.project, zone, instance.Name, accessConfigName, networkInterface.Name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete access config %s from instance %s", accessConfigName, instance.Name)
@@ -232,4 +232,33 @@ func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]
 		}
 		call = call.PageToken(list.NextPageToken)
 	}
+}
+
+func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) error {
+	// get the instance details
+	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to get instance %s", instanceID)
+	}
+	// list all assigned addresses
+	assigned, err := a.listAddresses(nil, "", inUseStatus)
+	if err != nil {
+		return errors.Wrap(err, "failed to list assigned addresses")
+	}
+	// if there are assigned addresses, check if they are assigned to the instance
+	if len(assigned) > 0 {
+		for _, address := range assigned {
+			for _, user := range address.Users {
+				if user == instance.SelfLink {
+					// release/remove current static public IP address
+					if err = a.deleteInstanceAddress(ctx, instance, zone); err != nil {
+						return errors.Wrap(err, "failed to delete current public IP address")
+					}
+					// break the loop after deleting the address
+					return nil
+				}
+			}
+		}
+	}
+	return nil
 }

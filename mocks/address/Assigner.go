@@ -67,6 +67,50 @@ func (_c *Assigner_Assign_Call) RunAndReturn(run func(context.Context, string, s
 	return _c
 }
 
+// Unassign provides a mock function with given fields: ctx, instanceID, zone
+func (_m *Assigner) Unassign(ctx context.Context, instanceID string, zone string) error {
+	ret := _m.Called(ctx, instanceID, zone)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, instanceID, zone)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Assigner_Unassign_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Unassign'
+type Assigner_Unassign_Call struct {
+	*mock.Call
+}
+
+// Unassign is a helper method to define mock.On call
+//   - ctx context.Context
+//   - instanceID string
+//   - zone string
+func (_e *Assigner_Expecter) Unassign(ctx interface{}, instanceID interface{}, zone interface{}) *Assigner_Unassign_Call {
+	return &Assigner_Unassign_Call{Call: _e.mock.On("Unassign", ctx, instanceID, zone)}
+}
+
+func (_c *Assigner_Unassign_Call) Run(run func(ctx context.Context, instanceID string, zone string)) *Assigner_Unassign_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *Assigner_Unassign_Call) Return(_a0 error) *Assigner_Unassign_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Assigner_Unassign_Call) RunAndReturn(run func(context.Context, string, string) error) *Assigner_Unassign_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewAssigner creates a new instance of Assigner. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewAssigner(t interface {

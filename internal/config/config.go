@@ -25,6 +25,8 @@ type Config struct {
 	RetryInterval time.Duration `json:"retry-interval"`
 	// Retry attempts
 	RetryAttempts int `json:"retry-attempts"`
+	// ReleaseOnExit releases the IP address on exit
+	ReleaseOnExit bool `json:"release-on-exit"`
 }
 
 func NewConfig(c *cli.Context) *Config {
@@ -38,5 +40,6 @@ func NewConfig(c *cli.Context) *Config {
 	cfg.OrderBy = c.String("order-by")
 	cfg.Project = c.String("project")
 	cfg.Region = c.String("region")
+	cfg.ReleaseOnExit = c.Bool("release-on-exit")
 	return &cfg
 }

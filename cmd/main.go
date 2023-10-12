@@ -102,7 +102,6 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 			case <-ticker.C:
 				continue
 			case <-ctx.Done():
-				log.Infof("kubeip agent stopped")
 				return errors.Wrap(err, "context is done")
 			}
 		}
@@ -157,12 +156,19 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		}
 	case <-ctx.Done():
 		log.Infof("kubeip agent stopped")
+		if cfg.ReleaseOnExit {
+			log.Infof("releasing static public IP address")
+			if err = assigner.Unassign(ctx, n.Instance, n.Zone); err != nil {
+				return errors.Wrap(err, "releasing static public IP address")
+			}
+		}
 	}
 
 	return nil
 }
 
 func runCmd(c *cli.Context) error {
+	// setup signal handler for graceful shutdown: SIGTERM, SIGINT
 	ctx := signals.SetupSignalHandler()
 	log := prepareLogger(c.String("log-level"), c.Bool("json"))
 	cfg := config.NewConfig(c)
@@ -233,6 +239,13 @@ func main() {
 						Value:    defaultRetryAttempts,
 						EnvVars:  []string{"RETRY_ATTEMPTS"},
 						Category: "Configuration",
+					},
+					&cli.BoolFlag{
+						Name:     "release-on-exit",
+						Usage:    "release the static public IP address on exit",
+						EnvVars:  []string{"RELEASE_ON_EXIT"},
+						Category: "Configuration",
+						Value:    true,
 					},
 					&cli.StringFlag{
 						Name:     "log-level",
