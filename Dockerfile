@@ -35,3 +35,4 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /app/.bin/kubeip /kubeip
 
 ENTRYPOINT ["/kubeip"]
+CMD ["run"]
