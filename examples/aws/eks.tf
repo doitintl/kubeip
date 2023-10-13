@@ -31,18 +31,6 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = concat(module.vpc.private_subnets, module.vpc.public_subnets)
 
-  cluster_addons = {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
-    }
-  }
-
   eks_managed_node_groups = {
     eks_nodes_public = {
       desired_size = 1
