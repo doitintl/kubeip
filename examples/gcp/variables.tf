@@ -1,6 +1,10 @@
+variable "project_id" {
+  type = string
+}
+
 variable "region" {
   type    = string
-  default = "us-west-2"
+  default = "us-central1"
 }
 
 variable "cluster_name" {
@@ -11,9 +15,4 @@ variable "cluster_name" {
 variable "vpc_name" {
   type    = string
   default = "kubeip-demo"
-}
-
-variable "kubernetes_version" {
-  type    = string
-  default = "1.28"
 }

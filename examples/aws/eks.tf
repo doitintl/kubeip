@@ -1,5 +1,5 @@
 provider "aws" {
-  region = "us-west-2" # replace with your region
+  region = var.region
 }
 
 module "vpc" {
@@ -130,5 +130,15 @@ module "kubeip_eks_role" {
       provider_arn               = module.eks.oidc_provider_arn
       namespace_service_accounts = ["kube-system:kubeip-sa"]
     }
+  }
+}
+
+# 5 elastic IPs in the same region
+resource "aws_eip" "kubeip" {
+  count = 5
+
+  tags = {
+    Name   = "kubeip-${count.index}"
+    kubeip = "reserved"
   }
 }
