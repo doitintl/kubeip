@@ -134,3 +134,69 @@ resource "aws_eip" "kubeip" {
     kubeip = "reserved"
   }
 }
+
+data "aws_eks_cluster_auth" "kubeip_cluster_auth" {
+  name = module.eks.cluster_name
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.kubeip_cluster_auth.token
+}
+
+resource "kubernetes_service_account" "kubeip_service_account" {
+  metadata {
+    name        = "kubeip-service-account"
+    namespace   = "kube-system"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = module.kubeip_eks_role.iam_role_arn
+    }
+  }
+  depends_on = [module.eks]
+}
+
+# Deploy KubeIP DaemonSet
+resource "kubernetes_daemonset" "kubeip_daemonset" {
+  metadata {
+    name      = "kubeip-agent"
+    namespace = "kube-system"
+    labels    = {
+      app = "kubeip"
+    }
+  }
+  spec {
+    selector {
+      match_labels = {
+        app = "kubeip"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "kubeip"
+        }
+      }
+      spec {
+        service_account_name = "kubeip-service-account"
+        container {
+          name  = "kubeip-agent"
+          image = "doitintl/kubeip-agent"
+          env {
+            name  = "FILTER"
+            value = "label.kubeip=reserved;labels.environment=demo"
+          }
+          env {
+            name  = "LOG_LEVEL"
+            value = "debug"
+          }
+        }
+        node_selector = {
+          nodegroup = "public"
+          kubeip    = "use"
+        }
+      }
+    }
+  }
+  depends_on = [kubernetes_service_account.kubeip_service_account]
+}

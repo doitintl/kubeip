@@ -189,7 +189,6 @@ resource "kubernetes_service_account" "kubeip_service_account" {
   ]
 }
 
-
 # Deploy KubeIP DaemonSet
 resource "kubernetes_daemonset" "kubeip_daemonset" {
   metadata {
