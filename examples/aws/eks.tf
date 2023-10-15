@@ -41,14 +41,6 @@ module "eks" {
       capacity_type  = "SPOT"
       platform       = "bottlerocket"
 
-      taints = [
-        {
-          key    = "kubeip"
-          value  = "use"
-          effect = "NO_SCHEDULE"
-        }
-      ]
-
       labels = {
         nodegroup = "public"
         kubeip    = "use"

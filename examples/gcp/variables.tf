@@ -16,3 +16,8 @@ variable "vpc_name" {
   type    = string
   default = "kubeip-demo"
 }
+
+variable "machine_type" {
+  type    = string
+  default = "e2-standard-2"
+}
