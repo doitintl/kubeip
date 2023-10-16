@@ -223,10 +223,25 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
             name  = "LOG_LEVEL"
             value = "debug"
           }
+          volume_mount {
+            mount_path = "/etc/podinfo"
+            name       = "podinfo"
+          }
         }
         node_selector = {
           nodegroup = "public"
           kubeip    = "use"
+        }
+        volume {
+          name = "podinfo"
+          downward_api {
+            items {
+              path = "nodeName"
+              field_ref {
+                field_path = "spec.nodeName"
+              }
+            }
+          }
         }
       }
     }

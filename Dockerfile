@@ -32,7 +32,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 # copy timezone settings
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 # copy the binary to the production image from the builder stage
-COPY --from=builder /app/.bin/kubeip /kubeip
+COPY --from=builder /app/.bin/kubeip-agent /kubeip-agent
 
 ENTRYPOINT ["/kubeip-agent"]
 CMD ["run"]
