@@ -61,8 +61,16 @@ resource "google_compute_subnetwork" "kubeip_subnet" {
   name                     = "kubeip-subnet"
   network                  = google_compute_network.vpc.id
   region                   = var.region
-  ip_cidr_range            = "10.0.1.0/24"
+  ip_cidr_range            = var.subnet_range
   private_ip_google_access = true
+  secondary_ip_range {
+    range_name    = var.services_range_name
+    ip_cidr_range = var.services_range
+  }
+  secondary_ip_range {
+    range_name    = var.pods_range_name
+    ip_cidr_range = var.pods_range
+  }
 }
 
 # Create GKE cluster
@@ -76,6 +84,11 @@ resource "google_container_cluster" "kubeip_cluster" {
   network    = google_compute_network.vpc.id
   subnetwork = google_compute_subnetwork.kubeip_subnet.id
 
+  ip_allocation_policy {
+    services_secondary_range_name = var.services_range_name
+    cluster_secondary_range_name  = var.pods_range_name
+  }
+
   # Enable Workload Identity
   workload_identity_config {
     workload_pool = "${var.project_id}.svc.id.goog"
@@ -84,9 +97,10 @@ resource "google_container_cluster" "kubeip_cluster" {
 
 # Create node pools
 resource "google_container_node_pool" "public_node_pool" {
-  name     = "public-node-pool"
-  location = google_container_cluster.kubeip_cluster.location
-  cluster  = google_container_cluster.kubeip_cluster.name
+  name               = "public-node-pool"
+  location           = google_container_cluster.kubeip_cluster.location
+  cluster            = google_container_cluster.kubeip_cluster.name
+  initial_node_count = 1
   autoscaling {
     min_node_count  = 1
     max_node_count  = 2
@@ -118,9 +132,10 @@ resource "google_container_node_pool" "public_node_pool" {
 }
 
 resource "google_container_node_pool" "private_node_pool" {
-  name     = "private-node-pool"
-  location = google_container_cluster.kubeip_cluster.location
-  cluster  = google_container_cluster.kubeip_cluster.name
+  name               = "private-node-pool"
+  location           = google_container_cluster.kubeip_cluster.location
+  cluster            = google_container_cluster.kubeip_cluster.name
+  initial_node_count = 1
   autoscaling {
     min_node_count  = 1
     max_node_count  = 2

@@ -1,6 +1,9 @@
 package types
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
 
 type CloudProvider string
 
@@ -19,4 +22,9 @@ type Node struct {
 	Zone        string
 	ExternalIPs []net.IP
 	InternalIPs []net.IP
+}
+
+// Stringer interface: all fields with name and value
+func (n *Node) String() string {
+	return fmt.Sprintf("%+v", *n)
 }

@@ -134,6 +134,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	if err != nil {
 		return errors.Wrap(err, "getting node")
 	}
+	log.WithField("node", n).Debug("node discovery done")
 
 	// assign static public IP address with retry (interval and attempts)
 	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg)
