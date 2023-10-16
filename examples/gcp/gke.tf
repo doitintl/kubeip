@@ -15,7 +15,7 @@ provider "google" {
 resource "google_project_iam_custom_role" "kubeip_role" {
   role_id     = "kubeip_role"
   title       = "KubeIP Role"
-  description = "KubeIP Role"
+  description = "KubeIP required permissions"
   stage       = "GA"
   permissions = [
     "compute.instances.addAccessConfig",
@@ -23,6 +23,8 @@ resource "google_project_iam_custom_role" "kubeip_role" {
     "compute.instances.get",
     "compute.addresses.list",
     "compute.zoneOperations.get",
+    "compute.zoneOperations.list",
+    "compute.subnetworks.useExternalIp",
     "compute.projects.get"
   ]
 }
@@ -84,9 +86,9 @@ resource "google_container_node_pool" "public_node_pool" {
   location = google_container_cluster.kubeip_cluster.location
   cluster  = google_container_cluster.kubeip_cluster.name
   autoscaling {
-    total_min_node_count = 1
-    total_max_node_count = 5
-    location_policy      = "ANY"
+    min_node_count  = 1
+    max_node_count  = 2
+    location_policy = "ANY"
   }
   node_config {
     machine_type = var.machine_type
@@ -118,9 +120,9 @@ resource "google_container_node_pool" "private_node_pool" {
   location = google_container_cluster.kubeip_cluster.location
   cluster  = google_container_cluster.kubeip_cluster.name
   autoscaling {
-    total_min_node_count = 1
-    total_max_node_count = 5
-    location_policy      = "ANY"
+    min_node_count  = 1
+    max_node_count  = 2
+    location_policy = "ANY"
   }
   node_config {
     machine_type = var.machine_type
@@ -189,6 +191,43 @@ resource "kubernetes_service_account" "kubeip_service_account" {
   ]
 }
 
+# Create cluster role with get node permission
+resource "kubernetes_cluster_role" "kubeip_cluster_role" {
+  metadata {
+    name = "kubeip-cluster-role"
+  }
+  rule {
+    api_groups = ["*"]
+    resources  = ["nodes"]
+    verbs      = ["get"]
+  }
+  depends_on = [
+    kubernetes_service_account.kubeip_service_account,
+    google_container_cluster.kubeip_cluster
+  ]
+}
+
+# Bind cluster role to kubeip service account
+resource "kubernetes_cluster_role_binding" "kubeip_cluster_role_binding" {
+  metadata {
+    name = "kubeip-cluster-role-binding"
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.kubeip_cluster_role.metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.kubeip_service_account.metadata[0].name
+    namespace = kubernetes_service_account.kubeip_service_account.metadata[0].namespace
+  }
+  depends_on = [
+    kubernetes_service_account.kubeip_service_account,
+    kubernetes_cluster_role.kubeip_cluster_role
+  ]
+}
+
 # Deploy KubeIP DaemonSet
 resource "kubernetes_daemonset" "kubeip_daemonset" {
   metadata {
@@ -216,32 +255,25 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           name  = "kubeip-agent"
           image = "doitintl/kubeip-agent"
           env {
-            name  = "FILTER"
-            value = "label.kubeip=reserved;labels.environment=demo"
-          }
-          env {
-            name  = "LOG_LEVEL"
-            value = "debug"
-          }
-          volume_mount {
-            mount_path = "/etc/podinfo"
-            name       = "podinfo"
-          }
-        }
-        node_selector = {
-          nodegroup = "public"
-          kubeip    = "use"
-        }
-        volume {
-          name = "podinfo"
-          downward_api {
-            items {
-              path = "nodeName"
+            name = "NODE_NAME"
+            value_from {
               field_ref {
                 field_path = "spec.nodeName"
               }
             }
           }
+          env {
+            name  = "FILTER"
+            value = "labels.kubeip=reserved;labels.environment=demo"
+          }
+          env {
+            name  = "LOG_LEVEL"
+            value = "debug"
+          }
+        }
+        node_selector = {
+          nodegroup = "public"
+          kubeip    = "use"
         }
       }
     }

@@ -21,6 +21,42 @@ Deploy KubeIP as a DaemonSet on your desired nodes using standard Kubernetes sel
 to each node it operates on. If no static public IP is available, KubeIP will wait until one becomes available. When a node is deleted,
 KubeIP will release the static public IP.
 
+### Kubernetes Service Account
+
+KubeIP requires a Kubernetes service account with the following permissions:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeip-service-account
+  namespace: kube-system
+---
+
+piVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeip-cluster-role
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "nodes" ]
+    verbs: [ "get" ]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeip-cluster-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: kubeip-service-account
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kubeip-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+```
+
 ### AWS
 
 Make sure that KubeIP DaemonSet is deployed on nodes that have a public IP (node in public subnet) and uses Kubernetes service
@@ -87,6 +123,7 @@ includedPermissions:
   - compute.instances.get
   - compute.addresses.list
   - compute.zoneOperations.get
+  - compute.subnetworks.useExternalIp
   - compute.projects.get
 ```
 

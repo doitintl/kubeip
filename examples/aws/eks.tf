@@ -156,6 +156,44 @@ resource "kubernetes_service_account" "kubeip_service_account" {
   depends_on = [module.eks]
 }
 
+# Create cluster role with get node permission
+resource "kubernetes_cluster_role" "kubeip_cluster_role" {
+  metadata {
+    name = "kubeip-cluster-role"
+  }
+  rule {
+    api_groups = ["*"]
+    resources  = ["nodes"]
+    verbs      = ["get"]
+  }
+  depends_on = [
+    kubernetes_service_account.kubeip_service_account,
+    module.eks
+  ]
+}
+
+# Bind cluster role to kubeip service account
+resource "kubernetes_cluster_role_binding" "kubeip_cluster_role_binding" {
+  metadata {
+    name = "kubeip-cluster-role-binding"
+  }
+  role_ref {
+    api_group = "rbac.authorization.k8s.io"
+    kind      = "ClusterRole"
+    name      = kubernetes_cluster_role.kubeip_cluster_role.metadata[0].name
+  }
+  subject {
+    kind      = "ServiceAccount"
+    name      = kubernetes_service_account.kubeip_service_account.metadata[0].name
+    namespace = kubernetes_service_account.kubeip_service_account.metadata[0].namespace
+  }
+  depends_on = [
+    kubernetes_service_account.kubeip_service_account,
+    kubernetes_cluster_role.kubeip_cluster_role
+  ]
+}
+
+
 # Deploy KubeIP DaemonSet
 resource "kubernetes_daemonset" "kubeip_daemonset" {
   metadata {
@@ -183,8 +221,16 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           name  = "kubeip-agent"
           image = "doitintl/kubeip-agent"
           env {
+            name = "NODE_NAME"
+            value_from {
+              field_ref {
+                field_path = "spec.nodeName"
+              }
+            }
+          }
+          env {
             name  = "FILTER"
-            value = "label.kubeip=reserved;labels.environment=demo"
+            value = "Name=tag:kubeip,Values=reserved;Name=tag:environment,Values=demo"
           }
           env {
             name  = "LOG_LEVEL"
