@@ -127,7 +127,8 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		return errors.Wrapf(err, "failed to wait for operation %s", op.Name)
+		// log error and continue
+		a.logger.WithError(err).Errorf("failed to wait for operation %s", op.Name)
 	}
 	return nil
 }
@@ -149,7 +150,8 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		return errors.Wrapf(err, "failed to wait for operation %s", op.Name)
+		// log error and continue
+		a.logger.WithError(err).Errorf("failed to wait for operation %s", op.Name)
 	}
 	return nil
 }

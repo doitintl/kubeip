@@ -22,6 +22,7 @@ resource "google_project_iam_custom_role" "kubeip_role" {
     "compute.instances.deleteAccessConfig",
     "compute.instances.get",
     "compute.addresses.list",
+    "compute.addresses.use",
     "compute.zoneOperations.get",
     "compute.zoneOperations.list",
     "compute.subnetworks.useExternalIp",
@@ -57,10 +58,11 @@ resource "google_compute_network" "vpc" {
 
 # Create a public subnet
 resource "google_compute_subnetwork" "kubeip_subnet" {
-  name          = "kubeip-subnet"
-  network       = google_compute_network.vpc.id
-  region        = var.region
-  ip_cidr_range = "10.0.1.0/24"
+  name                     = "kubeip-subnet"
+  network                  = google_compute_network.vpc.id
+  region                   = var.region
+  ip_cidr_range            = "10.0.1.0/24"
+  private_ip_google_access = true
 }
 
 # Create GKE cluster
