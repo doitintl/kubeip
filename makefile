@@ -46,7 +46,8 @@ setup-mockery:
 
 build: ; $(info $(M) building $(GOOS)/$(GOARCH) binary...) @ ## build with local Go SDK
 	$(GOBUILD) -v \
-	-ldflags '-X main.version=$(VERSION) -X main.buildDate=$(DATE) -X main.gitCommit=$(COMMIT) -X main.gitBranch=$(BRANCH)' \
+	-tags release \
+	-ldflags '-s -w -X main.version=$(VERSION) -X main.buildDate=$(DATE) -X main.gitCommit=$(COMMIT) -X main.gitBranch=$(BRANCH)' \
 	-o $(BIN)/$(BINARY_NAME) ./cmd/.
 
 lint: setup-lint; $(info $(M) running golangci-lint ...) @ ## run golangci-lint linters
