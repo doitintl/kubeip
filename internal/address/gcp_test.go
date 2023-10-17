@@ -128,7 +128,6 @@ func Test_gcpAssigner_waitForOperation(t *testing.T) {
 	type fields struct {
 		waiterFn func(t *testing.T) cloud.ZoneWaiter
 		project  string
-		logger   *logrus.Entry
 	}
 	type args struct {
 		op      *compute.Operation

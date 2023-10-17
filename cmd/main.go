@@ -36,8 +36,8 @@ var (
 
 const (
 	// DefaultRetryInterval is the default retry interval
-	defaultRetryInterval = 5 * time.Minute
-	defaultRetryAttempts = 10
+	defaultRetryInterval = time.Minute
+	defaultRetryAttempts = 60
 )
 
 func prepareLogger(level string, json bool) *logrus.Entry {

@@ -3,6 +3,7 @@ package address
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -32,6 +33,38 @@ type gcpAssigner struct {
 	project        string
 	region         string
 	logger         *logrus.Entry
+}
+
+type operationError struct {
+	name string
+	err  *compute.OperationError
+}
+
+func newOperationError(name string, err *compute.OperationError) *operationError {
+	return &operationError{name: name, err: err}
+}
+
+func isOperationError(err error) bool {
+	_, ok := err.(*operationError)
+	return ok
+}
+
+func joinErrorMessages(operationError *compute.OperationError) string {
+	if operationError == nil || len(operationError.Errors) == 0 {
+		return ""
+	}
+	messages := make([]string, 0, len(operationError.Errors))
+	for _, errorItem := range operationError.Errors {
+		messages = append(messages, errorItem.Message)
+	}
+	return strings.Join(messages, "; ")
+}
+
+func (e *operationError) Error() string {
+	if e.err == nil {
+		return ""
+	}
+	return fmt.Sprintf("operation %s failed with error %v", e.name, joinErrorMessages(e.err))
 }
 
 func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region string) (Assigner, error) {
@@ -72,17 +105,6 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 	}, nil
 }
 
-func joinErrorMessages(operationError *compute.OperationError) string {
-	if operationError == nil || len(operationError.Errors) == 0 {
-		return ""
-	}
-	messages := make([]string, 0, len(operationError.Errors))
-	for _, errorItem := range operationError.Errors {
-		messages = append(messages, errorItem.Message)
-	}
-	return strings.Join(messages, "; ")
-}
-
 func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation, zone string, timeout time.Duration) error {
 	if op == nil {
 		a.logger.Warn("operation is nil")
@@ -106,7 +128,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 		}
 		// If the operation has an error, return it
 		if op != nil && op.Error != nil {
-			return errors.Errorf("operation %s failed with error %v", op.Name, joinErrorMessages(op.Error))
+			return newOperationError(op.Name, op.Error)
 		}
 	}
 	return nil
@@ -139,8 +161,12 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		// log error and continue
-		a.logger.WithError(err).Errorf("failed to wait for operation %s", op.Name)
+		// return error if operation failed
+		if isOperationError(err) {
+			return err
+		}
+		// log error and continue (ignore non-operation errors)
+		a.logger.WithError(err).Errorf("failed waiting for operation %s", op.Name)
 	}
 	return nil
 }
@@ -149,15 +175,19 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 	// empty address means ephemeral public IP address
 	natIP := ""
 	name := defaultNetworkName
+	kind := "ephemeral"
 	if address != nil {
 		natIP = address.Address
 		name = address.Name
+		kind = "static"
 	}
 	// add instance network interface access config
 	a.logger.WithFields(logrus.Fields{
-		"instance": instance.Name,
-		"address":  address.Address,
-	}).Infof("adding reserved public IP address to instance")
+		"instance":     instance.Name,
+		"address-name": name,
+		"address-ip":   natIP,
+		"kind":         kind,
+	}).Info("adding public IP address to instance")
 	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, defaultNetworkInterface, &compute.AccessConfig{
 		Name:  name,
 		Type:  accessConfigType,
@@ -169,13 +199,24 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		// log error and continue
-		a.logger.WithError(err).Errorf("failed to wait for operation %s", op.Name)
+		// return error if operation failed
+		if isOperationError(err) {
+			return err
+		}
+		// log error and continue (ignore non-operation errors)
+		a.logger.WithError(err).Errorf("failed waiting for operation %s", op.Name)
 	}
 	return nil
 }
 
 func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
+	// insert random delay (0-60s) to reduce collisions
+	// between multiple kubeip instances running in the same cluster
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+	random := time.Duration(r.Intn(61)) * time.Second    //nolint:gomnd
+	a.logger.WithField("delay", random).Debug("inserting random delay")
+	time.Sleep(random)
+
 	// check if instance already has a public static IP address assigned
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
@@ -207,18 +248,32 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	if len(addresses) == 0 {
 		return errors.Errorf("no available addresses")
 	}
+	// log available addresses IPs
+	ips := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		ips = append(ips, address.Address)
+	}
+	a.logger.WithField("addresses", ips).Debugf("found %d available addresses", len(addresses))
 
 	// delete current ephemeral public IP address
 	if err = a.deleteInstanceAddress(ctx, instance, zone); err != nil {
 		return errors.Wrap(err, "failed to delete current public IP address")
 	}
 
-	// assign first available static public IP address to the instance
-	address := addresses[0]
-	if err = a.addInstanceAddress(ctx, instance, zone, address); err != nil {
+	// try to assign all available addresses until one succeeds
+	// due to concurrency, it is possible that another kubeip instance will assign the same address
+	for _, address := range addresses {
+		if err = a.addInstanceAddress(ctx, instance, zone, address); err != nil {
+			a.logger.WithError(err).Errorf("failed to assign static public IP address %s", address.Address)
+			a.logger.Debug("trying next address")
+			continue
+		}
+		// break the loop after assigning the address
+		break
+	}
+	if err != nil {
 		return errors.Wrap(err, "failed to assign static public IP address")
 	}
-
 	return nil
 }
 

@@ -101,7 +101,7 @@ func Test_assignAddress(t *testing.T) {
 			name: "error after a few retries and context is done",
 			args: args{
 				c: func() context.Context {
-					ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond)
+					ctx, _ := context.WithTimeout(context.Background(), 10*time.Millisecond) //nolint:govet
 					return ctx
 				}(),
 				assignerFn: func(t *testing.T) address.Assigner {
