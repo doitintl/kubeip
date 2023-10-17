@@ -342,7 +342,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "assign address successfully",
+			name: "assign static IP address successfully",
 			fields: fields{
 				project: "test-project",
 				region:  "test-region",

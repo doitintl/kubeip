@@ -19,6 +19,7 @@ const (
 	reservedStatus          = "RESERVED" // static IP addresses that are reserved but not currently in use
 	defaultTimeout          = 10 * time.Minute
 	defaultNetworkInterface = "nic0"
+	defaultNetworkName      = "External NAT"
 	accessConfigType        = "ONE_TO_ONE_NAT"
 	accessConfigKind        = "compute#accessConfig"
 )
@@ -71,6 +72,17 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 	}, nil
 }
 
+func joinErrorMessages(operationError *compute.OperationError) string {
+	if operationError == nil || len(operationError.Errors) == 0 {
+		return ""
+	}
+	messages := make([]string, 0, len(operationError.Errors))
+	for _, errorItem := range operationError.Errors {
+		messages = append(messages, errorItem.Message)
+	}
+	return strings.Join(messages, "; ")
+}
+
 func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation, zone string, timeout time.Duration) error {
 	if op == nil {
 		a.logger.Warn("operation is nil")
@@ -94,7 +106,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 		}
 		// If the operation has an error, return it
 		if op != nil && op.Error != nil {
-			return errors.Errorf("operation %s failed with error %v", op.Name, op.Error.Errors)
+			return errors.Errorf("operation %s failed with error %v", op.Name, joinErrorMessages(op.Error))
 		}
 	}
 	return nil
@@ -134,19 +146,26 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 }
 
 func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error {
+	// empty address means ephemeral public IP address
+	natIP := ""
+	name := defaultNetworkName
+	if address != nil {
+		natIP = address.Address
+		name = address.Name
+	}
 	// add instance network interface access config
 	a.logger.WithFields(logrus.Fields{
 		"instance": instance.Name,
 		"address":  address.Address,
 	}).Infof("adding reserved public IP address to instance")
 	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, defaultNetworkInterface, &compute.AccessConfig{
-		Name:  address.Name,
+		Name:  name,
 		Type:  accessConfigType,
 		Kind:  accessConfigKind,
-		NatIP: address.Address,
+		NatIP: natIP,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to add access config %s to instance %s", address.Name, instance.Name)
+		return errors.Wrapf(err, "failed to add access config %s to instance %s", name, instance.Name)
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
@@ -255,6 +274,10 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 					// release/remove current static public IP address
 					if err = a.deleteInstanceAddress(ctx, instance, zone); err != nil {
 						return errors.Wrap(err, "failed to delete current public IP address")
+					}
+					// assign ephemeral public IP address to the instance (pass nil address)
+					if err = a.addInstanceAddress(ctx, instance, zone, nil); err != nil {
+						return errors.Wrap(err, "failed to assign ephemeral public IP address")
 					}
 					// break the loop after deleting the address
 					return nil
