@@ -21,6 +21,7 @@ resource "google_project_iam_custom_role" "kubeip_role" {
     "compute.instances.addAccessConfig",
     "compute.instances.deleteAccessConfig",
     "compute.instances.get",
+    "compute.addresses.get",
     "compute.addresses.list",
     "compute.addresses.use",
     "compute.zoneOperations.get",
@@ -267,7 +268,8 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         }
       }
       spec {
-        service_account_name = "kubeip-service-account"
+        service_account_name             = "kubeip-service-account"
+        termination_grace_period_seconds = 30
         container {
           name  = "kubeip-agent"
           image = "doitintl/kubeip-agent"

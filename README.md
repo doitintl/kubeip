@@ -121,6 +121,7 @@ includedPermissions:
   - compute.instances.addAccessConfig
   - compute.instances.deleteAccessConfig
   - compute.instances.get
+  - compute.addresses.get
   - compute.addresses.list
   - compute.addresses.use
   - compute.zoneOperations.get

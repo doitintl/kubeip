@@ -3,7 +3,6 @@ package address
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -210,13 +209,6 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 }
 
 func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
-	// insert random delay (0-60s) to reduce collisions
-	// between multiple kubeip instances running in the same cluster
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
-	random := time.Duration(r.Intn(61)) * time.Second    //nolint:gomnd
-	a.logger.WithField("delay", random).Debug("inserting random delay")
-	time.Sleep(random)
-
 	// check if instance already has a public static IP address assigned
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {

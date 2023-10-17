@@ -136,6 +136,62 @@ func (_c *AddressManager_DeleteAccessConfig_Call) RunAndReturn(run func(string, 
 	return _c
 }
 
+// GetAddress provides a mock function with given fields: project, region, name
+func (_m *AddressManager) GetAddress(project string, region string, name string) (*compute.Address, error) {
+	ret := _m.Called(project, region, name)
+
+	var r0 *compute.Address
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string) (*compute.Address, error)); ok {
+		return rf(project, region, name)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string) *compute.Address); ok {
+		r0 = rf(project, region, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*compute.Address)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(project, region, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AddressManager_GetAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAddress'
+type AddressManager_GetAddress_Call struct {
+	*mock.Call
+}
+
+// GetAddress is a helper method to define mock.On call
+//   - project string
+//   - region string
+//   - name string
+func (_e *AddressManager_Expecter) GetAddress(project interface{}, region interface{}, name interface{}) *AddressManager_GetAddress_Call {
+	return &AddressManager_GetAddress_Call{Call: _e.mock.On("GetAddress", project, region, name)}
+}
+
+func (_c *AddressManager_GetAddress_Call) Run(run func(project string, region string, name string)) *AddressManager_GetAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *AddressManager_GetAddress_Call) Return(_a0 *compute.Address, _a1 error) *AddressManager_GetAddress_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AddressManager_GetAddress_Call) RunAndReturn(run func(string, string, string) (*compute.Address, error)) *AddressManager_GetAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewAddressManager creates a new instance of AddressManager. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewAddressManager(t interface {

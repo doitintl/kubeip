@@ -216,7 +216,8 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         }
       }
       spec {
-        service_account_name = "kubeip-service-account"
+        service_account_name             = "kubeip-service-account"
+        termination_grace_period_seconds = 30
         container {
           name  = "kubeip-agent"
           image = "doitintl/kubeip-agent"
