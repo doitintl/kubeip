@@ -345,11 +345,15 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 						return errors.Wrap(err, "failed to delete current public IP address")
 					}
 					// assign ephemeral public IP address to the instance (pass nil address)
-					if err = a.addInstanceAddress(ctx, instance, zone, nil); err != nil {
-						return errors.Wrap(err, "failed to assign ephemeral public IP address")
+					for {
+						// retry until ephemeral public IP address is assigned
+						// sometime this operation fails and needs to be retried
+						if err = a.addInstanceAddress(ctx, instance, zone, nil); err != nil {
+							a.logger.WithError(err).Error("failed to assign ephemeral public IP address, retrying")
+							continue
+						}
+						return nil
 					}
-					// break the loop after deleting the address
-					return nil
 				}
 			}
 		}
