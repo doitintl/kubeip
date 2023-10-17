@@ -208,7 +208,15 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 	return nil
 }
 
-func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
+func (a *gcpAssigner) forceCheckAddressAssigned(region, addressName string) (bool, error) {
+	address, err := a.addressManager.GetAddress(a.project, region, addressName)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get address %s", addressName)
+	}
+	return address.Status == inUseStatus, nil
+}
+
+func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error { //nonlint:gocyclo
 	// check if instance already has a public static IP address assigned
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
@@ -255,12 +263,26 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	// try to assign all available addresses until one succeeds
 	// due to concurrency, it is possible that another kubeip instance will assign the same address
 	for _, address := range addresses {
+		// force check if address is already assigned (reduce the chance of assigning the same address by multiple kubeip instances)
+		var addressAssigned bool
+		addressAssigned, err = a.forceCheckAddressAssigned(a.region, address.Name)
+		if err != nil {
+			a.logger.WithError(err).Errorf("failed to check if address %s is assigned", address.Address)
+			a.logger.Debug("trying next address")
+			continue
+		}
+		if addressAssigned {
+			a.logger.WithField("address", address.Address).Debug("address is already assigned")
+			a.logger.Debug("trying next address")
+			continue
+		}
+		// assign address to the instance and try the next address if it fails
 		if err = a.addInstanceAddress(ctx, instance, zone, address); err != nil {
 			a.logger.WithError(err).Errorf("failed to assign static public IP address %s", address.Address)
 			a.logger.Debug("trying next address")
 			continue
 		}
-		// break the loop after assigning the address
+		// break the loop after successfully assigning an address
 		break
 	}
 	if err != nil {

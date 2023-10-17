@@ -391,6 +391,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 						Kind:  accessConfigKind,
 						NatIP: "100.0.0.3",
 					}).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					mock.EXPECT().GetAddress("test-project", "test-region", "test-address-3").Return(&compute.Address{Name: "test-address-3", Status: reservedStatus}, nil)
 					return mock
 				},
 			},
