@@ -499,11 +499,29 @@ func Test_awsAssigner_Assign(t *testing.T) {
 							},
 						},
 					}, nil).Once()
+					mock.EXPECT().List(args.ctx, map[string][]string{
+						"allocation-id": {"eipalloc-0abcd1234efgh5678"},
+					}, true).Return([]types.Address{
+						{
+							AllocationId: aws.String("eipalloc-0abcd1234efgh5678"),
+							PublicIp:     aws.String("100.0.0.1"),
+							Tags: []types.Tag{
+								{
+									Key:   aws.String("env"),
+									Value: aws.String("test"),
+								},
+								{
+									Key:   aws.String("kubeip"),
+									Value: aws.String("reserved"),
+								},
+							},
+						},
+					}, nil).Once()
 					return mock
 				},
 				eipAssignerFn: func(t *testing.T, args *args) cloud.EipAssigner {
 					mock := mocks.NewEipAssigner(t)
-					mock.EXPECT().Assign(args.ctx, args.instanceID, "eni-0abcd1234efgh5678", tmock.Anything).Return(nil)
+					mock.EXPECT().Assign(args.ctx, "eni-0abcd1234efgh5678", tmock.Anything).Return(nil)
 					return mock
 				},
 			},

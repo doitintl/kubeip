@@ -22,13 +22,13 @@ func (_m *EipAssigner) EXPECT() *EipAssigner_Expecter {
 	return &EipAssigner_Expecter{mock: &_m.Mock}
 }
 
-// Assign provides a mock function with given fields: ctx, region, instanceID, address
-func (_m *EipAssigner) Assign(ctx context.Context, region string, instanceID string, address *types.Address) error {
-	ret := _m.Called(ctx, region, instanceID, address)
+// Assign provides a mock function with given fields: ctx, networkInterfaceID, address
+func (_m *EipAssigner) Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error {
+	ret := _m.Called(ctx, networkInterfaceID, address)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, *types.Address) error); ok {
-		r0 = rf(ctx, region, instanceID, address)
+	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Address) error); ok {
+		r0 = rf(ctx, networkInterfaceID, address)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -43,16 +43,15 @@ type EipAssigner_Assign_Call struct {
 
 // Assign is a helper method to define mock.On call
 //   - ctx context.Context
-//   - region string
-//   - instanceID string
+//   - networkInterfaceID string
 //   - address *types.Address
-func (_e *EipAssigner_Expecter) Assign(ctx interface{}, region interface{}, instanceID interface{}, address interface{}) *EipAssigner_Assign_Call {
-	return &EipAssigner_Assign_Call{Call: _e.mock.On("Assign", ctx, region, instanceID, address)}
+func (_e *EipAssigner_Expecter) Assign(ctx interface{}, networkInterfaceID interface{}, address interface{}) *EipAssigner_Assign_Call {
+	return &EipAssigner_Assign_Call{Call: _e.mock.On("Assign", ctx, networkInterfaceID, address)}
 }
 
-func (_c *EipAssigner_Assign_Call) Run(run func(ctx context.Context, region string, instanceID string, address *types.Address)) *EipAssigner_Assign_Call {
+func (_c *EipAssigner_Assign_Call) Run(run func(ctx context.Context, networkInterfaceID string, address *types.Address)) *EipAssigner_Assign_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(*types.Address))
+		run(args[0].(context.Context), args[1].(string), args[2].(*types.Address))
 	})
 	return _c
 }
@@ -62,7 +61,7 @@ func (_c *EipAssigner_Assign_Call) Return(_a0 error) *EipAssigner_Assign_Call {
 	return _c
 }
 
-func (_c *EipAssigner_Assign_Call) RunAndReturn(run func(context.Context, string, string, *types.Address) error) *EipAssigner_Assign_Call {
+func (_c *EipAssigner_Assign_Call) RunAndReturn(run func(context.Context, string, *types.Address) error) *EipAssigner_Assign_Call {
 	_c.Call.Return(run)
 	return _c
 }

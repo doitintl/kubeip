@@ -9,7 +9,7 @@ import (
 )
 
 type EipAssigner interface {
-	Assign(ctx context.Context, region, instanceID string, address *types.Address) error
+	Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error
 	Unassign(ctx context.Context, address *types.Address) error
 }
 
@@ -21,11 +21,10 @@ func NewEipAssigner(client *ec2.Client) EipAssigner {
 	return &eipAssigner{client: client}
 }
 
-func (a *eipAssigner) Assign(ctx context.Context, instanceID, networkInterfaceID string, address *types.Address) error {
+func (a *eipAssigner) Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error {
 	// associate elastic IP with the instance
 	input := &ec2.AssociateAddressInput{
 		AllocationId:       address.AllocationId,
-		InstanceId:         &instanceID,
 		NetworkInterfaceId: &networkInterfaceID,
 	}
 

@@ -42,7 +42,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     eks_nodes_public = {
-      desired_size = 1
+      desired_size = 3
       max_size     = 5
       min_size     = 1
 
@@ -127,7 +127,7 @@ module "kubeip_eks_role" {
 # 3 elastic IPs in the same region
 resource "aws_eip" "kubeip" {
   // default EIP limit is 5 (make sure to increase it if you need more)
-  count = 3
+  count = 5
 
   tags = {
     Name        = "kubeip-${count.index}"

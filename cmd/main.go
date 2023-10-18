@@ -159,7 +159,8 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		log.Infof("kubeip agent stopped")
 		if cfg.ReleaseOnExit {
 			log.Infof("releasing static public IP address")
-			if err = assigner.Unassign(ctx, n.Instance, n.Zone); err != nil {
+			// use a different context for releasing the static public IP address since the main context is canceled
+			if err = assigner.Unassign(context.Background(), n.Instance, n.Zone); err != nil {
 				return errors.Wrap(err, "releasing static public IP address")
 			}
 		}

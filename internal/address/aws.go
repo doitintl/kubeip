@@ -147,6 +147,24 @@ func sortAddressesByField(addresses []types.Address, sortBy string) {
 	}
 }
 
+func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationID string) (bool, error) {
+	// get elastic IP attached to the allocation ID
+	filters := make(map[string][]string)
+	filters["allocation-id"] = []string{allocationID}
+	addresses, err := a.eipLister.List(ctx, filters, true)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to list elastic IPs by allocation-id %s", allocationID)
+	}
+	if len(addresses) == 0 {
+		return false, nil
+	}
+	// check if the first address (and the only) is assigned
+	if addresses[0].AssociationId != nil {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) error {
 	// get elastic IP attached to the instance
 	filters := make(map[string][]string)
@@ -179,6 +197,13 @@ func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter [
 		return errors.Errorf("no available elastic IPs")
 	}
 
+	// log available addresses IPs
+	ips := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		ips = append(ips, *address.PublicIp)
+	}
+	a.logger.WithField("addresses", ips).Debugf("found %d available addresses", len(addresses))
+
 	// get EC2 instance
 	instance, err := a.instanceGetter.Get(ctx, instanceID, a.region)
 	if err != nil {
@@ -202,17 +227,48 @@ func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter [
 	// sort addresses by orderBy field
 	sortAddressesByField(addresses, orderBy)
 
-	// assign the first available elastic IP to the instance
-	address := addresses[0]
-	if err = a.eipAssigner.Assign(ctx, instanceID, networkInterfaceID, &address); err != nil {
-		return errors.Wrap(err, "failed to assign elastic IP")
+	// try to assign all available addresses until one succeeds
+	// due to concurrency, it is possible that another kubeip instance will assign the same address
+	for i := range addresses {
+		// force check if address is already assigned (reduce the chance of assigning the same address by multiple kubeip instances)
+		var addressAssigned bool
+		addressAssigned, err = a.forceCheckAddressAssigned(ctx, *addresses[i].AllocationId)
+		if err != nil {
+			a.logger.WithError(err).Errorf("failed to check if address %s is assigned", *addresses[i].PublicIp)
+			a.logger.Debug("trying next address")
+			continue
+		}
+		if addressAssigned {
+			a.logger.WithField("address", addresses[i].PublicIp).Debug("address is already assigned")
+			a.logger.Debug("trying next address")
+			continue
+		}
+		a.logger.WithFields(logrus.Fields{
+			"instance":           instanceID,
+			"address":            *addresses[i].PublicIp,
+			"allocation_id":      *addresses[i].AllocationId,
+			"networkInterfaceID": networkInterfaceID,
+		}).Debug("assigning elastic IP to the instance")
+		if err = a.eipAssigner.Assign(ctx, networkInterfaceID, &addresses[i]); err != nil {
+			a.logger.WithFields(logrus.Fields{
+				"instance":           instanceID,
+				"address":            *addresses[i].PublicIp,
+				"allocation_id":      *addresses[i].AllocationId,
+				"networkInterfaceID": networkInterfaceID,
+			}).Debug("failed to assign elastic IP to the instance")
+			a.logger.Debug("trying next address")
+			continue
+		}
+		a.logger.WithFields(logrus.Fields{
+			"instance":      instanceID,
+			"address":       *addresses[i].PublicIp,
+			"allocation_id": *addresses[i].AllocationId,
+		}).Info("elastic IP assigned to the instance")
+		break
 	}
-	a.logger.WithFields(logrus.Fields{
-		"instance":      instanceID,
-		"address":       *address.PublicIp,
-		"allocation_id": *address.AllocationId,
-	}).Info("elastic IP assigned to the instance")
-
+	if err != nil {
+		return errors.Wrap(err, "failed to assign elastic IP address")
+	}
 	return nil
 }
 
