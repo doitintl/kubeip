@@ -5,18 +5,27 @@ provider "aws" {
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
 
-  name                 = var.vpc_name
-  cidr                 = "10.0.0.0/16"
-  azs                  = ["us-west-2a", "us-west-2b", "us-west-2c"]
-  private_subnets      = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets       = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
+  name                    = var.vpc_name
+  cidr                    = var.vpc_cidr
+  azs                     = var.availability_zones
+  private_subnets         = var.private_cidr_ranges
+  public_subnets          = var.public_cidr_ranges
+  enable_nat_gateway      = true
+  single_nat_gateway      = true
+  enable_dns_hostnames    = true
+  map_public_ip_on_launch = true
 
   tags = {
     App = "kubeip"
     Env = "demo"
+  }
+  public_subnet_tags = {
+    public      = "true"
+    environment = "demo"
+  }
+  private_subnet_tags = {
+    public      = "false"
+    environment = "demo"
   }
 }
 
@@ -37,9 +46,8 @@ module "eks" {
       max_size     = 5
       min_size     = 1
 
-      instance_types = ["t4g.micro", "t4g.small"]
+      instance_types = ["t3a.small", "t3a.medium"]
       capacity_type  = "SPOT"
-      platform       = "bottlerocket"
 
       labels = {
         nodegroup = "public"
@@ -47,8 +55,8 @@ module "eks" {
       }
 
       tags = {
-        Environment = "demo"
         Name        = "public-node-group"
+        environment = "demo"
         public      = "true"
         kubeip      = "use"
       }
@@ -61,9 +69,8 @@ module "eks" {
       max_size     = 5
       min_size     = 1
 
-      instance_types = ["t4g.micro", "t4g.small"]
+      instance_types = ["t3a.small", "t3a.medium"]
       capacity_type  = "SPOT"
-      platform       = "bottlerocket"
 
       labels = {
         nodegroup = "private"
@@ -71,26 +78,18 @@ module "eks" {
       }
 
       tags = {
-        Environment = "demo"
         Name        = "private-node-group"
+        environment = "demo"
       }
 
       subnet_ids = module.vpc.private_subnets
     }
   }
-
-  # aws-auth configmap
-  manage_aws_auth_configmap = true
-
-  tags = {
-    App         = "kubeip"
-    Environment = "demo"
-  }
 }
 
 resource "aws_iam_policy" "kubeip-policy" {
   name        = "kubeip-policy"
-  description = "KubeIP policy"
+  description = "KubeIP required permissions"
 
   policy = jsonencode({
     Version   = "2012-10-17"
@@ -120,18 +119,20 @@ module "kubeip_eks_role" {
   oidc_providers = {
     main = {
       provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:kubeip-sa"]
+      namespace_service_accounts = ["kube-system:kubeip-service-account"]
     }
   }
 }
 
-# 5 elastic IPs in the same region
+# 3 elastic IPs in the same region
 resource "aws_eip" "kubeip" {
-  count = 5
+  // default EIP limit is 5 (make sure to increase it if you need more)
+  count = 3
 
   tags = {
-    Name   = "kubeip-${count.index}"
-    kubeip = "reserved"
+    Name        = "kubeip-${count.index}"
+    environment = "demo"
+    kubeip      = "reserved"
   }
 }
 
