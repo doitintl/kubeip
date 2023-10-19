@@ -3,6 +3,7 @@ package cloud
 import (
 	"context"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/pkg/errors"
 )
@@ -25,6 +26,7 @@ func (a *eipAssigner) Assign(ctx context.Context, networkInterfaceID, allocation
 	input := &ec2.AssociateAddressInput{
 		AllocationId:       &allocationID,
 		NetworkInterfaceId: &networkInterfaceID,
+		AllowReassociation: aws.Bool(false), // do not allow reassociation of the elastic IP
 	}
 
 	_, err := a.client.AssociateAddress(ctx, input)
