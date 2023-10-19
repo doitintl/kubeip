@@ -270,6 +270,7 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
       spec {
         service_account_name             = "kubeip-service-account"
         termination_grace_period_seconds = 30
+        priority_class_name              = "system-node-critical"
         container {
           name  = "kubeip-agent"
           image = "doitintl/kubeip-agent"
@@ -288,6 +289,11 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           env {
             name  = "LOG_LEVEL"
             value = "debug"
+          }
+          resources {
+            requests = {
+              cpu = "100m"
+            }
           }
         }
         node_selector = {
