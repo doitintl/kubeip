@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/pkg/errors"
 )
 
 type EipAssigner interface {
-	Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error
-	Unassign(ctx context.Context, address *types.Address) error
+	Assign(ctx context.Context, networkInterfaceID, allocationID string) error
+	Unassign(ctx context.Context, associationID string) error
 }
 
 type eipAssigner struct {
@@ -21,10 +20,10 @@ func NewEipAssigner(client *ec2.Client) EipAssigner {
 	return &eipAssigner{client: client}
 }
 
-func (a *eipAssigner) Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error {
+func (a *eipAssigner) Assign(ctx context.Context, networkInterfaceID, allocationID string) error {
 	// associate elastic IP with the instance
 	input := &ec2.AssociateAddressInput{
-		AllocationId:       address.AllocationId,
+		AllocationId:       &allocationID,
 		NetworkInterfaceId: &networkInterfaceID,
 	}
 
@@ -36,10 +35,10 @@ func (a *eipAssigner) Assign(ctx context.Context, networkInterfaceID string, add
 	return nil
 }
 
-func (a *eipAssigner) Unassign(ctx context.Context, address *types.Address) error {
+func (a *eipAssigner) Unassign(ctx context.Context, associationID string) error {
 	// disassociate elastic IP from the instance
 	input := &ec2.DisassociateAddressInput{
-		AssociationId: address.AssociationId,
+		AssociationId: &associationID,
 	}
 
 	_, err := a.client.DisassociateAddress(ctx, input)

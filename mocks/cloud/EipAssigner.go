@@ -5,7 +5,6 @@ package mocks
 import (
 	context "context"
 
-	types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,13 +21,13 @@ func (_m *EipAssigner) EXPECT() *EipAssigner_Expecter {
 	return &EipAssigner_Expecter{mock: &_m.Mock}
 }
 
-// Assign provides a mock function with given fields: ctx, networkInterfaceID, address
-func (_m *EipAssigner) Assign(ctx context.Context, networkInterfaceID string, address *types.Address) error {
-	ret := _m.Called(ctx, networkInterfaceID, address)
+// Assign provides a mock function with given fields: ctx, networkInterfaceID, allocationID
+func (_m *EipAssigner) Assign(ctx context.Context, networkInterfaceID string, allocationID string) error {
+	ret := _m.Called(ctx, networkInterfaceID, allocationID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, *types.Address) error); ok {
-		r0 = rf(ctx, networkInterfaceID, address)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, networkInterfaceID, allocationID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -44,14 +43,14 @@ type EipAssigner_Assign_Call struct {
 // Assign is a helper method to define mock.On call
 //   - ctx context.Context
 //   - networkInterfaceID string
-//   - address *types.Address
-func (_e *EipAssigner_Expecter) Assign(ctx interface{}, networkInterfaceID interface{}, address interface{}) *EipAssigner_Assign_Call {
-	return &EipAssigner_Assign_Call{Call: _e.mock.On("Assign", ctx, networkInterfaceID, address)}
+//   - allocationID string
+func (_e *EipAssigner_Expecter) Assign(ctx interface{}, networkInterfaceID interface{}, allocationID interface{}) *EipAssigner_Assign_Call {
+	return &EipAssigner_Assign_Call{Call: _e.mock.On("Assign", ctx, networkInterfaceID, allocationID)}
 }
 
-func (_c *EipAssigner_Assign_Call) Run(run func(ctx context.Context, networkInterfaceID string, address *types.Address)) *EipAssigner_Assign_Call {
+func (_c *EipAssigner_Assign_Call) Run(run func(ctx context.Context, networkInterfaceID string, allocationID string)) *EipAssigner_Assign_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(*types.Address))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -61,18 +60,18 @@ func (_c *EipAssigner_Assign_Call) Return(_a0 error) *EipAssigner_Assign_Call {
 	return _c
 }
 
-func (_c *EipAssigner_Assign_Call) RunAndReturn(run func(context.Context, string, *types.Address) error) *EipAssigner_Assign_Call {
+func (_c *EipAssigner_Assign_Call) RunAndReturn(run func(context.Context, string, string) error) *EipAssigner_Assign_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// Unassign provides a mock function with given fields: ctx, address
-func (_m *EipAssigner) Unassign(ctx context.Context, address *types.Address) error {
-	ret := _m.Called(ctx, address)
+// Unassign provides a mock function with given fields: ctx, associationID
+func (_m *EipAssigner) Unassign(ctx context.Context, associationID string) error {
+	ret := _m.Called(ctx, associationID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *types.Address) error); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, associationID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -87,14 +86,14 @@ type EipAssigner_Unassign_Call struct {
 
 // Unassign is a helper method to define mock.On call
 //   - ctx context.Context
-//   - address *types.Address
-func (_e *EipAssigner_Expecter) Unassign(ctx interface{}, address interface{}) *EipAssigner_Unassign_Call {
-	return &EipAssigner_Unassign_Call{Call: _e.mock.On("Unassign", ctx, address)}
+//   - associationID string
+func (_e *EipAssigner_Expecter) Unassign(ctx interface{}, associationID interface{}) *EipAssigner_Unassign_Call {
+	return &EipAssigner_Unassign_Call{Call: _e.mock.On("Unassign", ctx, associationID)}
 }
 
-func (_c *EipAssigner_Unassign_Call) Run(run func(ctx context.Context, address *types.Address)) *EipAssigner_Unassign_Call {
+func (_c *EipAssigner_Unassign_Call) Run(run func(ctx context.Context, associationID string)) *EipAssigner_Unassign_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*types.Address))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -104,7 +103,7 @@ func (_c *EipAssigner_Unassign_Call) Return(_a0 error) *EipAssigner_Unassign_Cal
 	return _c
 }
 
-func (_c *EipAssigner_Unassign_Call) RunAndReturn(run func(context.Context, *types.Address) error) *EipAssigner_Unassign_Call {
+func (_c *EipAssigner_Unassign_Call) RunAndReturn(run func(context.Context, string) error) *EipAssigner_Unassign_Call {
 	_c.Call.Return(run)
 	return _c
 }

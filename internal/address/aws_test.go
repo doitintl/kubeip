@@ -10,7 +10,6 @@ import (
 	"github.com/doitintl/kubeip/internal/cloud"
 	mocks "github.com/doitintl/kubeip/mocks/cloud"
 	"github.com/sirupsen/logrus"
-	tmock "github.com/stretchr/testify/mock"
 )
 
 func Test_sortAddressesByTag(t *testing.T) {
@@ -455,6 +454,9 @@ func Test_awsAssigner_Assign(t *testing.T) {
 								Association: &types.InstanceNetworkInterfaceAssociation{
 									PublicIp: aws.String("135.64.10.1"),
 								},
+								Attachment: &types.InstanceNetworkInterfaceAttachment{
+									DeviceIndex: aws.Int32(0),
+								},
 								NetworkInterfaceId: aws.String("eni-0abcd1234efgh5678"),
 							},
 						},
@@ -521,7 +523,7 @@ func Test_awsAssigner_Assign(t *testing.T) {
 				},
 				eipAssignerFn: func(t *testing.T, args *args) cloud.EipAssigner {
 					mock := mocks.NewEipAssigner(t)
-					mock.EXPECT().Assign(args.ctx, "eni-0abcd1234efgh5678", tmock.Anything).Return(nil)
+					mock.EXPECT().Assign(args.ctx, "eni-0abcd1234efgh5678", "eipalloc-0abcd1234efgh5678").Return(nil)
 					return mock
 				},
 			},

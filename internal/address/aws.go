@@ -213,11 +213,13 @@ func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter [
 	if instance.NetworkInterfaces == nil || len(instance.NetworkInterfaces) == 0 {
 		return errors.Errorf("no network interfaces found for instance %s", instanceID)
 	}
-	// get network interface ID of network interface with public IP address
+	// get primary network interface ID with public IP address (DeviceIndex == 0)
 	networkInterfaceID := ""
 	for _, ni := range instance.NetworkInterfaces {
-		if ni.Association != nil && ni.Association.PublicIp != nil {
+		if ni.Association != nil && ni.Association.PublicIp != nil &&
+			ni.Attachment != nil && ni.Attachment.DeviceIndex != nil && *ni.Attachment.DeviceIndex == 0 {
 			networkInterfaceID = *ni.NetworkInterfaceId
+			break
 		}
 	}
 	if networkInterfaceID == "" {
@@ -249,7 +251,7 @@ func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter [
 			"allocation_id":      *addresses[i].AllocationId,
 			"networkInterfaceID": networkInterfaceID,
 		}).Debug("assigning elastic IP to the instance")
-		if err = a.eipAssigner.Assign(ctx, networkInterfaceID, &addresses[i]); err != nil {
+		if err = a.eipAssigner.Assign(ctx, networkInterfaceID, *addresses[i].AllocationId); err != nil {
 			a.logger.WithFields(logrus.Fields{
 				"instance":           instanceID,
 				"address":            *addresses[i].PublicIp,
@@ -287,13 +289,14 @@ func (a *awsAssigner) Unassign(ctx context.Context, instanceID, _ string) error 
 
 	// unassign elastic IP from the instance
 	address := addresses[0]
-	if err = a.eipAssigner.Unassign(ctx, &address); err != nil {
+	if err = a.eipAssigner.Unassign(ctx, *address.AssociationId); err != nil {
 		return errors.Wrap(err, "failed to unassign elastic IP")
 	}
 	a.logger.WithFields(logrus.Fields{
 		"instance":      instanceID,
 		"address":       *address.PublicIp,
 		"allocation_id": *address.AllocationId,
+		"associationId": *address.AssociationId,
 	}).Info("elastic IP unassigned from the instance")
 
 	return nil
