@@ -57,26 +57,11 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-### AWS
+### Kubernetes DaemonSet
 
-Make sure that KubeIP DaemonSet is deployed on nodes that have a public IP (node in public subnet) and uses Kubernetes service
-account [bound](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html)
-to IAM role with the following permissions:
-
-```yaml
-Version: '2012-10-17'
-Statement:
-  - Effect: Allow
-    Action:
-      - ec2:AssociateAddress
-      - ec2:DisassociateAddress
-      - ec2:DescribeInstances
-      - ec2:DescribeAddresses
-    Resource: '*'
-```
-
-KubeIP supports filtering of reserved Elastic IPs using tags. To use this feature, add the `filter` flag (or set `FILTER` environment
-variable) to the KubeIP DaemonSet:
+Deploy KubeIP as a DaemonSet on your desired nodes using standard Kubernetes selectors. Once deployed, KubeIP will assign a static public IP
+to the node's primary network interface, selected from a list of reserved static IPs using platform-supported filtering. If no static public
+IP is available, KubeIP will wait until one becomes available. When a node is deleted, KubeIP will release the static public IP.
 
 ```yaml
 apiVersion: apps/v1
@@ -92,15 +77,54 @@ spec:
       labels:
         app: kubeip
     spec:
-      serviceAccountName: kubeip-sa
+      serviceAccountName: kubeip-service-account
+      terminationGracePeriodSeconds: 30
+      priorityClassName: system-node-critical
       nodeSelector:
         kubeip.com/public: "true"
       containers:
         - name: kubeip
           image: doitintl/kubeip-agent
+          resources:
+            requests:
+              cpu: 100m
           env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: FILTER
-              value: "Name=tag:env,Values=dev;Name=tag:app,Values=streamer"
+              value: PUT_PLATFORM_SPECIFIC_FILTER_HERE
+            - name: LOG_LEVEL
+              value: debug
+            - name: LOG_JSON
+              value: "true"
+```
+
+### AWS
+
+Make sure that KubeIP DaemonSet is deployed on nodes that have a public IP (node running in public subnet) and uses a Kubernetes service
+account [bound](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) to the IAM role with the following
+permissions:
+
+```yaml
+Version: '2012-10-17'
+Statement:
+  - Effect: Allow
+    Action:
+      - ec2:AssociateAddress
+      - ec2:DisassociateAddress
+      - ec2:DescribeInstances
+      - ec2:DescribeAddresses
+    Resource: '*'
+```
+
+KubeIP supports filtering of reserved Elastic IPs using tags and Elastic IP properties. To use this feature, add the `filter` flag (or
+set `FILTER` environment variable) to the KubeIP DaemonSet:
+
+```yaml
+- name: FILTER
+  value: "Name=tag:env,Values=dev;Name=tag:app,Values=streamer"
 ```
 
 KubeIP AWS filter supports the same filter syntax as the AWS `describe-addresses` command. For more information,
@@ -137,28 +161,8 @@ semicolons (`;`).
 To use this feature, add the `filter` flag (or set `FILTER` environment variable) to the KubeIP DaemonSet:
 
 ```yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: kubeip
-spec:
-  selector:
-    matchLabels:
-      app: kubeip
-  template:
-    metadata:
-      labels:
-        app: kubeip
-    spec:
-      serviceAccountName: kubeip-sa
-      nodeSelector:
-        kubeip.com/public: "true"
-      containers:
-        - name: kubeip
-          image: doitintl/kubeip-agent
-          env:
-            - name: FILTER
-              value: "labels.env=dev;labels.app=streamer"
+- name: FILTER
+  value: "labels.env=dev;labels.app=streamer"
 ```
 
 ## How to contribute to KubeIP?
@@ -221,3 +225,31 @@ public subnet). Configure KubeIP to use the pool of reserved static public IPs, 
 
 Finally, scale the number of nodes in the cluster and verify that KubeIP assigns a static public IP to each node. Scale down the number of
 nodes in the cluster and verify that KubeIP releases the static public IP addresses.
+
+#### AWS EKS Example
+
+The [examples/aws](examples/aws) folder contains a Terraform configuration that creates an EKS cluster and deploys KubeIP as a DaemonSet on
+the cluster nodes in a public subnet. The Terraform configuration also creates a pool of reserved Elastic IPs and configures KubeIP to use
+the pool of reserved static public IPs.
+
+To run the example, follow these steps:
+
+```shell
+cd examples/aws
+terraform init
+terraform apply
+```
+
+#### Google Cloud GKE Example
+
+The [examples/gcp](examples/gcp) folder contains a Terraform configuration that creates a GKE cluster and deploys KubeIP as a DaemonSet on
+the cluster nodes in a public subnet. The Terraform configuration also creates a pool of reserved static public IPs and configures KubeIP to
+use the pool of reserved static public IPs.
+
+To run the example, follow these steps:
+
+```shell
+cd examples/gcp
+terraform init
+terraform apply -var="project_id=<your-project-id>"
+```

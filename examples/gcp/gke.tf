@@ -290,6 +290,10 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
             name  = "LOG_LEVEL"
             value = "debug"
           }
+          evn {
+            name  = "LOG_JSON"
+            value = "true"
+          }
           resources {
             requests = {
               cpu = "100m"
