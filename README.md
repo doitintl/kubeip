@@ -17,14 +17,27 @@ will fix critical bugs and security issues, but we will not add new features.
 
 ## What KubeIP v2 does?
 
-KubeIP is a tool that assigns a static public IP to any node it operates on. The IP is assigned to the node's primary network interface,
-selected from a list of reserved static IPs using platform-supported filtering and ordering. If no static public IP is available, KubeIP
-will wait until one becomes available. When a node is deleted, KubeIP will release the static public IP back to the pool of reserved static
-IPs.
+Kubernetes' nodes don't necessarily need their own public IP addresses to communicate. However, there are certain situations where it's
+beneficial for nodes in a node pool to have their own unique public IP addresses.
+
+For instance, in gaming applications, a console might need to establish a direct connection with a cloud virtual machine to reduce the
+number of hops.
+
+Similarly, if you have multiple agents running on Kubernetes that need a direct server connection, and the server needs to whitelist all
+agent IPs, having dedicated public IPs can be useful. These scenarios, among others, can be handled on a cloud-managed Kubernetes cluster
+using Node Public IP.
+
+KubeIP is a utility that assigns a static public IP to each node it manages. The IP is allocated to the node's primary network interface,
+chosen from a pool of reserved static IPs using platform-supported filtering and ordering.
+
+If there are no static public IPs left, KubeIP will hold on until one becomes available. When a node is removed, KubeIP releases the static
+public IP back into the pool of reserved static IPs.
 
 ## How to use KubeIP?
 
-Deploy KubeIP as a DaemonSet on your desired nodes using standard Kubernetes selectors. Once deployed, KubeIP will assign a static public IP
+Deploy KubeIP as a DaemonSet on your desired nodes using standard
+Kubernetes [mechanism](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/). Once deployed, KubeIP will assign a static
+public IP
 to each node it operates on. If no static public IP is available, KubeIP will wait until one becomes available. When a node is deleted,
 KubeIP will release the static public IP.
 
