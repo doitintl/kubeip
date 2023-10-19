@@ -3,17 +3,24 @@
 # KubeIP v2
 
 Welcome to KubeIP v2, a complete overhaul of the popular [DoiT](https://www.doit.com/)
-KubeIP [v1](https://github.com/doitintl/kubeip/tree/v1-main) open-source project, originally developed
+KubeIP [v1-main](https://github.com/doitintl/kubeip/tree/v1-main) open-source project, originally developed
 by [Aviv Laufer](https://github.com/avivl).
 
 KubeIP v2 expands its support beyond Google Cloud (as in v1) to include AWS, and it's designed to be extendable to other cloud providers
 that allow assigning static public IP to VMs. We've also transitioned from a Kubernetes controller to a standard DaemonSet, enhancing
 reliability and ease of use.
 
-## What KubeIP does?
+## What happens with KubeIP v1
+
+KubeIP v1 is still available in the [v1-main](https://github.com/doitintl/kubeip/tree/v1-main) branch. No further development is planned. We
+will fix critical bugs and security issues, but we will not add new features.
+
+## What KubeIP v2 does?
 
 KubeIP is a tool that assigns a static public IP to any node it operates on. The IP is assigned to the node's primary network interface,
-selected from a list of reserved static IPs using platform-supported filtering.
+selected from a list of reserved static IPs using platform-supported filtering and ordering. If no static public IP is available, KubeIP
+will wait until one becomes available. When a node is deleted, KubeIP will release the static public IP back to the pool of reserved static
+IPs.
 
 ## How to use KubeIP?
 
