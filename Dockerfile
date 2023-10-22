@@ -1,40 +1,38 @@
-FROM --platform=$BUILDPLATFORM golang:1.20-alpine AS builder
-# curl git bash
-RUN apk add --no-cache curl git bash make
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
 
-# ----- build and test -----
-FROM builder as build
+# add CA certificates and TZ for local time
+RUN apk --update add ca-certificates tzdata make git
 
-# set working directorydoc
-RUN mkdir -p /go/src/app
-WORKDIR /go/src/app
+# create a working directory
+WORKDIR /app
 
-# load dependency
-COPY Makefile .
-COPY go.mod .
-COPY go.sum .
-RUN --mount=type=cache,target=/root/.cache/go-build go mod download
+# Retrieve application dependencies.
+# This allows the container build to reuse cached dependencies.
+# Expecting to copy go.mod and if present go.sum.
+COPY go.* ./
+RUN go mod download
 
-# copy sources
-COPY . .
+# Copy local code to the container image.
+COPY . ./
 
-# build arguments (passed from buildx)
+# get version, commit and branch from build args
+ARG VERSION
+ARG COMMIT
+ARG BRANCH
 ARG TARGETOS
 ARG TARGETARCH
 
-# build
-RUN --mount=type=cache,target=/root/.cache/go-build make binary TARGETOS=${TARGETOS} TARGETARCH=${TARGETARCH}
+# Build the binary with make (using the version, commit and branch)
+RUN make build VERSION=${VERSION} COMMIT=${COMMIT} BRANCH=${BRANCH} TARGETOS=${TARGETOS} TARGETARCH=${TARGETARCH}
 
-#
-# ------ release Docker image ------
-#
+# final image
 FROM scratch
 # copy CA certificates
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-# this is the last command since it's never cached
-COPY --from=build /go/src/app/.bin/github.com/doitintl/kubeip /kubeip
+# copy timezone settings
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# copy the binary to the production image from the builder stage
+COPY --from=builder /app/.bin/kubeip-agent /kubeip-agent
 
-ENTRYPOINT ["/kubeip"]
-
-
-# RUN cd /go/src/github.com/doitintl/kubeip && GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a --installsuffix cgo --ldflags="-s"  -ldflags "-X main.version=$(git log | head -n 1 | cut  -f 2 -d ' ') -X main.buildDate=$(date +%Y-%m-%d\-%H:%M)" -o /kubeip
+ENTRYPOINT ["/kubeip-agent"]
+CMD ["run"]

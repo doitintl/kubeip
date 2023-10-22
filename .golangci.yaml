@@ -1,0 +1,146 @@
+run:
+  # which dirs to skip
+  skip-dirs:
+    - mocks
+  # Timeout for analysis, e.g. 30s, 5m.
+  # Default: 1m
+  timeout: 5m
+  # Exit code when at least one issue was found.
+  # Default: 1
+  issues-exit-code: 2
+  # Include test files or not.
+  # Default: true
+  tests: false
+  # allow parallel run
+  allow-parallel-runners: true
+
+linters-settings:
+  govet:
+    check-shadowing: true
+  gocyclo:
+    min-complexity: 15
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+    ignore-words:
+      - "cancelled"
+  goimports:
+    local-prefixes: github.com/golangci/golangci-lint
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport # https://github.com/go-critic/go-critic/issues/845
+      - ifElseChain
+      - octalLiteral
+      - rangeValCopy
+      - unnamedResult
+      - whyNoLint
+      - wrapperFunc
+  funlen:
+    lines: 105
+    statements: 50
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    # - containedctx
+    # - contextcheck disabled because of generics
+    - dupword
+    - decorder
+    # - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    # - exhaustivestruct TODO: check how to fix it
+    - exportloopref
+    # - forbidigo TODO: configure forbidden code patterns
+    # - forcetypeassert
+    - funlen
+    - gci
+    # - gochecknoglobals TODO: remove globals from code
+    # - gochecknoinits TODO: remove main.init
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    #    - godox
+    - goerr113
+    - gofmt
+    - goimports
+    - gomnd
+    # - gomoddirectives
+    - gosec
+    - gosimple
+    - govet
+    - goprintffuncname
+    - grouper
+    - importas
+    # - ireturn TODO: not sure if it is a good linter
+    - ineffassign
+    - interfacebloat
+    - loggercheck
+    - maintidx
+    - makezero
+    - misspell
+    - nakedret
+    # - nestif
+    - nilerr
+    - nilnil
+    # - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - promlinter
+    - reassign
+    - revive
+    # - rowserrcheck disabled because of generics
+    # - staticcheck doesn't work with go1.19
+    # - structcheck disabled because of generics
+    - stylecheck
+    - tenv
+    - testableexamples
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    # - varnamelen TODO: review naming
+    # - varcheck depricated 1.49
+    # - wastedassign disabled because of generics
+    - whitespace
+    - wrapcheck
+    # - wsl
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - funlen
+        - bodyclose
+        - gosec
+        - dupl
+        - gocognit
+        - goconst
+        - gocyclo
+  exclude:
+    - Using the variable on range scope `tt` in function literal

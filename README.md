@@ -1,343 +1,275 @@
-![ci](https://github.com/doitintl/kubeip/workflows/build/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip)
-
-# What is kubeIP?
-
-Many applications need to be whitelisted by users based on a Source IP Address. As of today, Google Kubernetes Engine doesn't support assigning a static pool of IP addresses to the GKE cluster. Using kubeIP, this problem is solved by assigning GKE nodes external IP addresses from a predefined list. kubeIP monitors the Kubernetes API for new/removed nodes and applies the changes accordingly.
-
-# Deploy kubeIP (without building from source)
-
-If you just want to use kubeIP (instead of building it yourself from source), please follow the instructions in this section. You’ll need Kubernetes version 1.10 or newer. You'll also need the Google Cloud SDK. You can install the [Google Cloud SDK](https://cloud.google.com/sdk) (which also installs kubectl).
-
-To configure your Google Cloud SDK, set default project as:
-
-```
-gcloud config set project {your project_id}
-```
-
-Set the environment variables and make sure to configure before continuing:
-
-```
-export GCP_REGION=<gcp-region>
-export GCP_ZONE=<gcp-zone>
-export GKE_CLUSTER_NAME=<cluster-name>
-export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
-export KUBEIP_NODEPOOL=<nodepool-with-static-ips>
-export KUBEIP_SELF_NODEPOOL=<nodepool-for-kubeip-to-run-in>
-```
-
-**Get credentials for yourself**
-
-If you haven't alrady, set up your GKE cluster credentials with
-(replace `$GKE_CLUSTER_NAME` with your real GKE cluster name):
-
-```
-gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
-    --region $GCP_ZONE \
-    --project $PROJECT_ID
-```
-
-You will need admin access to the cluster to deploy to the `kube-system` namespace.
-Either set the relevant IAM rolebinding for your user, or get RBAC permissions with:
-
-```
-kubectl create clusterrolebinding cluster-admin-binding \
-    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
-```
-
-**Creating an IAM Service Account**
-
-Create a Service Account with this command:
-
-```
-gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
-```
-
-Create and attach a custom kubeIP role to the service account by running the following commands:
-
-```
-gcloud iam roles create kubeip --project $PROJECT_ID --file roles.yaml
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member=serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com \
-    --role=projects/$PROJECT_ID/roles/kubeip \
-    --condition=None
-```
-
-**Getting credentials to the deployment**
-
-Note: If you use Workload Identity in your cluster, you do not need to upload a credential file.
-You can just remove the GOOGLE_APPLICATION_CREDENTIALS environment variable from the manifest
-and the Google Cloud SDK will pick up the credentials from the metadata server as per normal
-operation.
-
-Generate the Key using the following command:
-```
-gcloud iam service-accounts keys create key.json \
-    --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
-```
-
-Create a Kubernetes secret object by running:
-```
-kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
-```
-
-**Create Static, Reserved IP Addresses:**
-
-Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (manually or automatically):
-
-```
-for i in {1..10}; do gcloud compute addresses create kubeip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
-```
-
-Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster (for example cluster name):
-
-```
-for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels kubeip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
-```
-
-```
-sed -i -e "s/reserved/$GKE_CLUSTER_NAME/g" -e "s/default-pool/$KUBEIP_NODEPOOL/g" deploy/kubeip-configmap.yaml
-```
-
-Make sure the `deploy/kubeip-configmap.yaml` file contains the correct values:
-
- - The `KUBEIP_LABELVALUE` should be your GKE's cluster name
- - The `KUBEIP_NODEPOOL` should match the name of your GKE node-pool on which kubeIP will operate
- - The `KUBEIP_FORCEASSIGNMENT` - controls whether kubeIP should assign static IPs to existing nodes in the node-pool and defaults to true
-
-We recommend that KUBEIP_NODEPOOL should *NOT* be the same as KUBEIP_SELF_NODEPOOL
-
-
-If you would like to assign addresses to other node pools, then `KUBEIP_NODEPOOL` can be added to this nodepool `KUBEIP_ADDITIONALNODEPOOLS` as a comma separated list.
-You should tag the addresses for this pool with the `KUBEIP_LABELKEY` value + `-node-pool` and assign the value of the node pool a name i.e.,  `kubeip-node-pool=my-node-pool`
-
-```
-sed -i -e "s/pool-kubip/$KUBEIP_SELF_NODEPOOL/g" deploy/kubeip-deployment.yaml
-```
-
-Deploy kubeIP by running:
-
-```
-kubectl apply -f deploy/.
-```
-
-Once you’ve assigned an IP address to a node kubeIP, a label will be created for that node `kubip_assigned` with the value of the IP address (`.` are replaced with `-`):
-
- `172.31.255.255 ==> 172-31-255-255`
-
-**Ordering IPs**
-
-KubeIP can order IPs based on the numeric value identified by `KUBEIP_ORDERBYLABELKEY`.  
-
-IPs are ordered in descending order if `KUBEIP_ORDERBYDESC` is set to true, ascending order otherwise. 
-
-Missing `KUBEIP_ORDERBYLABELKEY` or invalid values present on `KUBEIP_ORDERBYLABELKEY` will be assigned the lowest priority.  
-
-When nodes are added, deleted or on tick, kubeIP will check whether the nodes have the most optimal IP assignment.  What does this mean? 
-
-E.g. Let's assume Node1 has IP_A, Node2 has IP_B and IP_A > IP_B, when we scale the cluster down the cluster two things might happen  
-1. Node 1 is deleted which results in a sub-optimal IP assignment since Node2 has IP_B and IP_A > IP_B
-2. Node 2 is deleted maintaining optimal order.  
-
-In the first case Node 2 is re-assigned IP_A.  
-
-To order the IPs reserved above in asc order use 
-
-```
-for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels priority=$i --region=$GCP_REGION; done
-```
-
-and set 
-
-```
-KUBEIP_ORDERBYLABELKEY: "priority"
-KUBEIP_ORDERBYDESC: "false"
+![build](https://github.com/doitintl/kubeip/workflows/build/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip-agent)
+
+# KubeIP v2
+
+Welcome to KubeIP v2, a complete overhaul of the popular [DoiT](https://www.doit.com/)
+KubeIP [v1-main](https://github.com/doitintl/kubeip/tree/v1-main) open-source project, originally developed
+by [Aviv Laufer](https://github.com/avivl).
+
+KubeIP v2 expands its support beyond Google Cloud (as in v1) to include AWS, and it's designed to be extendable to other cloud providers
+that allow assigning static public IP to VMs. We've also transitioned from a Kubernetes controller to a standard DaemonSet, enhancing
+reliability and ease of use.
+
+## What happens with KubeIP v1
+
+KubeIP v1 is still available in the [v1-main](https://github.com/doitintl/kubeip/tree/v1-main) branch. No further development is planned. We
+will fix critical bugs and security issues, but we will not add new features.
+
+## What KubeIP v2 does?
+
+Kubernetes' nodes don't necessarily need their own public IP addresses to communicate. However, there are certain situations where it's
+beneficial for nodes in a node pool to have their own unique public IP addresses.
+
+For instance, in gaming applications, a console might need to establish a direct connection with a cloud virtual machine to reduce the
+number of hops.
+
+Similarly, if you have multiple agents running on Kubernetes that need a direct server connection, and the server needs to whitelist all
+agent IPs, having dedicated public IPs can be useful. These scenarios, among others, can be handled on a cloud-managed Kubernetes cluster
+using Node Public IP.
+
+KubeIP is a utility that assigns a static public IP to each node it manages. The IP is allocated to the node's primary network interface,
+chosen from a pool of reserved static IPs using platform-supported filtering and ordering.
+
+If there are no static public IPs left, KubeIP will hold on until one becomes available. When a node is removed, KubeIP releases the static
+public IP back into the pool of reserved static IPs.
+
+## How to use KubeIP?
+
+Deploy KubeIP as a DaemonSet on your desired nodes using standard
+Kubernetes [mechanism](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/). Once deployed, KubeIP will assign a static
+public IP
+to each node it operates on. If no static public IP is available, KubeIP will wait until one becomes available. When a node is deleted,
+KubeIP will release the static public IP.
+
+### Kubernetes Service Account
+
+KubeIP requires a Kubernetes service account with the following permissions:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeip-service-account
+  namespace: kube-system
+---
+
+piVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeip-cluster-role
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "nodes" ]
+    verbs: [ "get" ]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubeip-cluster-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: kubeip-service-account
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kubeip-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+```
+
+### Kubernetes DaemonSet
+
+Deploy KubeIP as a DaemonSet on your desired nodes using standard Kubernetes selectors. Once deployed, KubeIP will assign a static public IP
+to the node's primary network interface, selected from a list of reserved static IPs using platform-supported filtering. If no static public
+IP is available, KubeIP will wait until one becomes available. When a node is deleted, KubeIP will release the static public IP.
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kubeip
+spec:
+  selector:
+    matchLabels:
+      app: kubeip
+  template:
+    metadata:
+      labels:
+        app: kubeip
+    spec:
+      serviceAccountName: kubeip-service-account
+      terminationGracePeriodSeconds: 30
+      priorityClassName: system-node-critical
+      nodeSelector:
+        kubeip.com/public: "true"
+      containers:
+        - name: kubeip
+          image: doitintl/kubeip-agent
+          resources:
+            requests:
+              cpu: 100m
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: FILTER
+              value: PUT_PLATFORM_SPECIFIC_FILTER_HERE
+            - name: LOG_LEVEL
+              value: debug
+            - name: LOG_JSON
+              value: "true"
 ```
-
-**Copy Labels**
-
-KubeIP will also copy all labels from the IP being assigned over to the node if `KUBEIP_COPYLABELS` is set to true.  
 
-This is typically helpful when we want to have node selection not based on IP but more semantic label keys and values.  
+### AWS
 
-As an example let's label `kubeip-ip1` with `platform_whitelisted=true`, to do this we execute the following command 
+Make sure that KubeIP DaemonSet is deployed on nodes that have a public IP (node running in public subnet) and uses a Kubernetes service
+account [bound](https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html) to the IAM role with the following
+permissions:
 
+```yaml
+Version: '2012-10-17'
+Statement:
+  - Effect: Allow
+    Action:
+      - ec2:AssociateAddress
+      - ec2:DisassociateAddress
+      - ec2:DescribeInstances
+      - ec2:DescribeAddresses
+    Resource: '*'
 ```
-gcloud beta compute addresses update kubeip-ip1 --update-labels "platform_whitelisted=true" --region=$GCP_REGION;
-```
-
-Now, when a node is assigned the IP address of `kubeip-ip1` it will also be labelled with `platform_whitelisted=true` as well as the default `kubip_assigned`.  
-
-An IP can have multiple labels, all will be copied over.
-
-**Clear Labels**
-
-When IPs get assigned or re-assigned to achieve optimal IP assignment we can configure the system to clear any previous labels. Set `KUBEIP_CLEARLABELS` flag to `true` if you want this behaviour. 
 
-This feature is required when labels are not overlapping.  E.g. let's assume we have the following tagged IPs; IP_A and IP_B, order by priority
+KubeIP supports filtering of reserved Elastic IPs using tags and Elastic IP properties. To use this feature, add the `filter` flag (or
+set `FILTER` environment variable) to the KubeIP DaemonSet:
 
+```yaml
+- name: FILTER
+  value: "Name=tag:env,Values=dev;Name=tag:app,Values=streamer"
 ```
-IP_A test_a=value_a,test_b=value_b,priority=1
-IP_B test_c=value_c,priority=2
-```
-Let's assume that the assignment was as follows 
-
-```
-IP_A => NodeA
-IP_B => NodeB
-```
-
-At this point `NodeA` has labels `test_a=value_a,test_b=value_b` and `NodeB` has labels `test_c=value_c`.  Note priority is not copied over.  
-
-If `NodeA` is deleted a re-assignment needs to happen (due to the fact that IP_A > IP_B) and `NodeB` would have
-- `test_a=value_a,test_b=value_b,test_c=value_c` if `KUBEIP_CLEARLABELS="false"` and 
-- `test_a=value_a,test_b=value_b` if `KUBEIP_CLEARLABELS="true"`
-
-Note that `test_c` is not an overlapping label and hence might cause problems if `KUBEIP_CLEARLABELS` is not set to `true`.  
-
-**Dry Run Mode**
 
-Dry run mode allows debugging the operations performed by KubeIP without actually performing the operations.  
-
-ONLY use this mode during development of new features on KubeIP.  
-
-
-# Deploy & Build From Source
-
-You need Kubernetes version 1.10 or newer. You also need Docker version and kubectl 1.10.x or newer installed on your machine, as well as the Google Cloud SDK. You can install the [Google Cloud SDK](https://cloud.google.com/sdk) (which also installs kubectl).
-
-
-**Clone Git Repository**
-
-Make sure your $GOPATH is [configured](https://github.com/golang/go/wiki/SettingGOPATH). You'll need to clone this repository to your `$GOPATH/src` folder. 
-
-```
-mkdir -p $GOPATH/src/doitintl/kubeip
-git clone https://github.com/doitintl/kubeip.git $GOPATH/src/doitintl/kubeip
-cd $GOPATH/src/doitintl/kubeip
-```
+KubeIP AWS filter supports the same filter syntax as the AWS `describe-addresses` command. For more information,
+see [describe-addresses](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-addresses.html#options). If you specify multiple
+filters, they are joined with an `AND`, and the request returns only results that match all the specified filters. Multiple filters must be
+separated by semicolons (`;`).
 
-**Set Environment Variables**
+### Google Cloud
 
-Replace **us-central1** with the region where your GKE cluster resides and **kubeip-cluster** with your real GKE cluster name
+Ensure that the KubeIP DaemonSet is deployed on nodes with a public IP (nodes in a public subnet) and uses a Kubernetes service
+account [bound](https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity) to an IAM role with the following permissions:
 
-```
-export GCP_REGION=us-central1
-export GCP_ZONE=us-central1-b
-export GKE_CLUSTER_NAME=kubeip-cluster
-export PROJECT_ID=$(gcloud config list --format 'value(core.project)')
+```yaml
+title: "KubeIP Role"
+description: "KubeIP required permissions"
+stage: "GA"
+includedPermissions:
+  - compute.instances.addAccessConfig
+  - compute.instances.deleteAccessConfig
+  - compute.instances.get
+  - compute.addresses.get
+  - compute.addresses.list
+  - compute.addresses.use
+  - compute.zoneOperations.get
+  - compute.subnetworks.useExternalIp
+  - compute.projects.get
 ```
 
-**Develop kubeIP Locally**
+KubeIP Google Cloud filter supports the same filter syntax as the Google Cloud `gcloud compute addresses list` command. For more
+information, see [gcloud topic filter](https://cloud.google.com/sdk/gcloud/reference/topic/filters). If you specify multiple filters, they
+are joined with an `AND`, and the request returns only results that match all the specified filters. Multiple filters must be separated by
+semicolons (`;`).
 
-Compile the kubeIP binary and run tests
+To use this feature, add the `filter` flag (or set `FILTER` environment variable) to the KubeIP DaemonSet:
 
+```yaml
+- name: FILTER
+  value: "labels.env=dev;labels.app=streamer"
 ```
-make
-```
-
-**Build kubeIP's Container Image**
 
-
-Compile the kubeIP binary and build the Docker image as following:
-
-```
-make image
-```
+## How to contribute to KubeIP?
 
-Tag the image using:
+KubeIP is an open-source project, and we welcome your contributions!
 
-```
-docker tag kubeip gcr.io/$PROJECT_ID/kubeip
-```
+## How to build KubeIP?
 
-Finally, push the image to Google Container Registry with:
+KubeIP is written in Go and can be built using standard Go tools. To build KubeIP, run the following command:
 
+```shell
+make build
 ```
-docker push gcr.io/$PROJECT_ID/kubeip
-```
-
-Alternatively, you can export `REGISTRY` to `gcr.io/$PROJECT_ID` and run the script `build-all-and-push.sh` which builds and publishes the docker image.
 
-**Create IAM Service Account and obtain the Key in JSON format**
+## How to run KubeIP?
 
-Create a Service Account with this command:
+KubeIP is a standard command-line application. To explore the available options, run the following command:
 
+```shell
+kubeip-agent run --help
 ```
-gcloud iam service-accounts create kubeip-service-account --display-name "kubeIP"
-```
-
-Create and attach the custom kubeIP role to the service account by running the following commands:
 
-```
-gcloud iam roles create kubeip --project $PROJECT_ID --file roles.yaml
-
-gcloud projects add-iam-policy-binding $PROJECT_ID --member serviceAccount:kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com --role projects/$PROJECT_ID/roles/kubeip
-```
+```text
+NAME:
+   kubeip-agent run - run agent
 
-Generate the Key using the following command:
+USAGE:
+   kubeip-agent run [command options] [arguments...]
 
-```
-gcloud iam service-accounts keys create key.json \
-  --iam-account kubeip-service-account@$PROJECT_ID.iam.gserviceaccount.com
-```
+OPTIONS:
+   Configuration
 
-**Create Kubernetes Secret**
+   --filter value [ --filter value ]  filter for the IP addresses [$FILTER]
+   --kubeconfig value                 path to Kubernetes configuration file (not needed if running in node) [$KUBECONFIG]
+   --node-name value                  Kubernetes node name (not needed if running in node) [$NODE_NAME]
+   --order-by value                   order by for the IP addresses [$ORDER_BY]
+   --project value                    name of the GCP project or the AWS account ID (not needed if running in node) [$PROJECT]
+   --region value                     name of the GCP region or the AWS region (not needed if running in node) [$REGION]
+   --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
+   --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]
+   --retry-interval value             when the agent fails to assign the static public IP address, it will retry after this interval (default: 5m0s) [$RETRY_INTERVAL]
 
-Get your GKE cluster credentaials with (replace *cluster_name* with your real GKE cluster name):
+   Development
 
-```
-gcloud container clusters get-credentials $GKE_CLUSTER_NAME \
-    --region $GCP_ZONE \
-    --project $PROJECT_ID
-```
+   --develop-mode  enable develop mode (default: false) [$DEV_MODE]
 
-Create a Kubernetes secret by running:
+   Logging
 
+   --json             produce log in JSON format: Logstash and Splunk friendly (default: false) [$LOG_JSON]
+   --log-level value  set log level (debug, info(*), warning, error, fatal, panic) (default: "info") [$LOG_LEVEL]
 ```
-kubectl create secret generic kubeip-key --from-file=key.json -n kube-system
-```
 
-**We need to get RBAC permissions first with**
-```
-kubectl create clusterrolebinding cluster-admin-binding \
-    --clusterrole cluster-admin --user `gcloud config list --format 'value(core.account)'`
-```
+## How to test KubeIP?
 
-**Create static reserved IP addresses:**
+To test KubeIP, create a pool of reserved static public IPs, ensuring that the pool has enough IPs to assign to all nodes that KubeIP will
+operate on. Use labels to filter the pool of reserved static public IPs.
 
-Create as many static IP addresses for the number of nodes in your GKE cluster (this example creates 10 addresses) so you will have enough addresses when your cluster scales up (automatically or manually):
+Next, create a Kubernetes cluster and deploy KubeIP as a DaemonSet on your desired nodes. Ensure that the nodes have a public IP (nodes in a
+public subnet). Configure KubeIP to use the pool of reserved static public IPs, using filters and order by.
 
-```
-for i in {1..10}; do gcloud compute addresses create kubeip-ip$i --project=$PROJECT_ID --region=$GCP_REGION; done
-```
+Finally, scale the number of nodes in the cluster and verify that KubeIP assigns a static public IP to each node. Scale down the number of
+nodes in the cluster and verify that KubeIP releases the static public IP addresses.
 
-Add labels to reserved IP addresses. A common practice is to assign a unique value per cluster. You can use your cluster name for example:
+#### AWS EKS Example
 
-```
-for i in {1..10}; do gcloud beta compute addresses update kubeip-ip$i --update-labels kubeip=$GKE_CLUSTER_NAME --region $GCP_REGION; done
-```
+The [examples/aws](examples/aws) folder contains a Terraform configuration that creates an EKS cluster and deploys KubeIP as a DaemonSet on
+the cluster nodes in a public subnet. The Terraform configuration also creates a pool of reserved Elastic IPs and configures KubeIP to use
+the pool of reserved static public IPs.
 
-Adjust the deploy/kubeip-configmap.yaml with your GKE cluster name (replace the GKE-cluster-name with your real GKE cluster name):
+To run the example, follow these steps:
 
-```
-sed -i -e "s/reserved/$GKE_CLUSTER_NAME/g" deploy/kubeip-configmap.yaml
+```shell
+cd examples/aws
+terraform init
+terraform apply
 ```
 
-Adjust the `deploy/kubeip-deployment.yaml` to reflect your real container image path:
+#### Google Cloud GKE Example
 
- - Edit the `image` to match your container image path, i.e. `gcr.io/$PROJECT_ID/kubeip`
+The [examples/gcp](examples/gcp) folder contains a Terraform configuration that creates a GKE cluster and deploys KubeIP as a DaemonSet on
+the cluster nodes in a public subnet. The Terraform configuration also creates a pool of reserved static public IPs and configures KubeIP to
+use the pool of reserved static public IPs.
 
-By default, kubeIP will only manage the nodes in default-pool nodepool. If you'd like kubeIP to manage another node-pool, please update the `KUBEIP_NODEPOOL` setting in `deploy/kubeip-configmap.yaml` file before deploying. You can also update the `KUBEIP_LABELKEY` and `KUBEIP_LABELVALUE` to control which static external IP addresses the kubeIP will look for to assign to your nodes. 
+To run the example, follow these steps:
 
-The `KUBEIP_FORCEASSIGNMENT` (which defaults to true) will check on startup and every five minutes if there are nodes in the node-pool that are not assigned to a reserved address. If such nodes are found, then kubeIP will assign a reserved address (if one is available to them):
-
-Deploy kubeIP by running
-
+```shell
+cd examples/gcp
+terraform init
+terraform apply -var="project_id=<your-project-id>"
 ```
-kubectl apply -f deploy/.
-```
-
-References:
-
- - Event listening code was take from [kubewatch](https://github.com/bitnami-labs/kubewatch/)

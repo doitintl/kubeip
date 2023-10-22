@@ -1,19 +1,50 @@
-# code coverage
-.cover
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+.bin
 
-# git repo
-.git
+# Test binary, built with `go test -c`
+*.test
+.run
 
-# IDE customization
+# Local environment
+.env
+.in
+.out
+
+# Local .terraform directories
+**/.terraform/*
+
+# Sonar Scanner
+.scannerwork/
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# IDE support files
 .idea
 .vscode
 
-# binaries
-.bin
+# MacOS file system metadata
+.DS_Store
 
-# env customization
-.env
-.in
+# local credentials
+.credentials
 
-# Test binary, build with `go test -c`
-*.test
+# Keep out some temporary example code and temprary file
+example_code/
+older/
+temp/
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+tmp/
