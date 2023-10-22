@@ -20,7 +20,7 @@ func NewEc2InstanceGetter(client *ec2.Client) Ec2InstanceGetter {
 	return &ec2InstanceGetter{client: client}
 }
 
-func (g *ec2InstanceGetter) Get(ctx context.Context, instanceID, region string) (*types.Instance, error) {
+func (g *ec2InstanceGetter) Get(ctx context.Context, instanceID, _ string) (*types.Instance, error) {
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []string{
 			instanceID,
