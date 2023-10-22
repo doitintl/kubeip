@@ -66,7 +66,6 @@ test: ; $(info $(M) running test ...) @ ## run tests with coverage
 
 test-json: ; $(info $(M) running test output JSON ...) @ ## run tests with JSON report and coverage
 	$Q $(GOTEST) -v -cover ./... -coverprofile=coverage.out -json > test-report.out
-	$Q $(GOTOOL) cover -func=coverage.out
 
 precommit: lint test ; $(info $(M) test and lint ...) @ ## release cycle: test > lint
 

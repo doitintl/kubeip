@@ -37,6 +37,18 @@ jobs:
           make lint
           make test-json
 
+      - name: upload test results
+        uses: actions/upload-artifact@v3
+        if: ${{ always() }}
+        with:
+          name: test-reports
+          if-no-files-found: ignore
+          path: |
+            test-report.out
+            coverage.out
+            golangci-lint.out
+  
+  
   docker-build:
 
     runs-on: ubuntu-latest
