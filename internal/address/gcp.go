@@ -44,7 +44,7 @@ func newOperationError(name string, err *compute.OperationError) *operationError
 }
 
 func isOperationError(err error) bool {
-	_, ok := err.(*operationError)
+	_, ok := err.(*operationError) //nolint:errorlint
 	return ok
 }
 
@@ -216,7 +216,8 @@ func (a *gcpAssigner) forceCheckAddressAssigned(region, addressName string) (boo
 	return address.Status == inUseStatus, nil
 }
 
-func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error { //nonlint:gocyclo
+//nolint:gocyclo
+func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
 	// check if instance already has a public static IP address assigned
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
