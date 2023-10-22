@@ -3,9 +3,7 @@ name: build
 on:
   push:
     branches:
-      - '*'
-    tags:
-      - '*'
+      - 'v1-main'
     paths-ignore:
       - 'docs/**'
       - 'deploy/**'
@@ -14,7 +12,7 @@ on:
       - '*.sh'
   pull_request:
     branches:
-      - '*'
+      - 'v1-main'
 
 jobs:
 
