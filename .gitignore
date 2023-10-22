@@ -18,6 +18,9 @@
 # Local .terraform directories
 **/.terraform/*
 
+# Sonar Scanner
+.scannerwork/
+
 # .tfstate files
 *.tfstate
 *.tfstate.*
