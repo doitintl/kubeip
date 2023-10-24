@@ -285,5 +285,5 @@ To run the example with GKE dual-stack IPv4/IPv6 cluster, follow these steps:
 ```shell
 cd examples/gcp
 terraform init
-terraform apply -var="project_id=<your-project-id>" -var="ipv6=true"
+terraform apply -var="project_id=<your-project-id>" -var="ipv6_support=true"
 ```
