@@ -14,14 +14,15 @@ import (
 )
 
 const (
-	operationDone           = "DONE" // operation status DONE
-	inUseStatus             = "IN_USE"
-	reservedStatus          = "RESERVED" // static IP addresses that are reserved but not currently in use
-	defaultTimeout          = 10 * time.Minute
-	defaultNetworkInterface = "nic0"
-	defaultNetworkName      = "External NAT"
-	accessConfigType        = "ONE_TO_ONE_NAT"
-	accessConfigKind        = "compute#accessConfig"
+	operationDone               = "DONE" // operation status DONE
+	inUseStatus                 = "IN_USE"
+	reservedStatus              = "RESERVED" // static IP addresses that are reserved but not currently in use
+	defaultTimeout              = 10 * time.Minute
+	defaultNetworkNameIPv6      = "External IPv6"
+	defaultAccessConfigType     = "ONE_TO_ONE_NAT"
+	defaultAccessConfigIPv6Type = "DIRECT_IPV6"
+	accessConfigKind            = "compute#accessConfig"
+	defaultPrefixLength         = 96
 )
 
 type gcpAssigner struct {
@@ -31,6 +32,7 @@ type gcpAssigner struct {
 	instanceGetter cloud.InstanceGetter
 	project        string
 	region         string
+	ipv6           bool
 	logger         *logrus.Entry
 }
 
@@ -66,7 +68,7 @@ func (e *operationError) Error() string {
 	return fmt.Sprintf("operation %s failed with error %v", e.name, joinErrorMessages(e.err))
 }
 
-func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region string) (Assigner, error) {
+func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region string, ipv6 bool) (Assigner, error) {
 	// initialize Google Cloud client
 	client, err := compute.NewService(ctx)
 	if err != nil {
@@ -96,10 +98,11 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 	return &gcpAssigner{
 		lister:         cloud.NewLister(client),
 		waiter:         cloud.NewZoneWaiter(client),
-		addressManager: cloud.NewAddressManager(client),
+		addressManager: cloud.NewAddressManager(client, ipv6),
 		instanceGetter: cloud.NewInstanceGetter(client),
 		project:        project,
 		region:         region,
+		ipv6:           ipv6,
 		logger:         logger,
 	}, nil
 }
@@ -141,20 +144,34 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 	}
 	// get instance network interface
 	networkInterface := instance.NetworkInterfaces[0]
-	// get instance network interface access config
-	if len(networkInterface.AccessConfigs) == 0 {
-		a.logger.WithField("instance", instance.Name).Info("instance network interface has no access configs")
-		return nil
+
+	var accessConfig *compute.AccessConfig
+	var address string
+	if a.ipv6 {
+		// get instance network interface access config
+		if len(networkInterface.Ipv6AccessConfigs) == 0 {
+			a.logger.WithField("instance", instance.Name).Info("instance network interface has no IPv6 access configs")
+			return nil
+		}
+		accessConfig = networkInterface.Ipv6AccessConfigs[0]
+		address = accessConfig.ExternalIpv6
+	} else {
+		// get instance network interface access config
+		if len(networkInterface.AccessConfigs) == 0 {
+			a.logger.WithField("instance", instance.Name).Info("instance network interface has no access configs")
+			return nil
+		}
+		accessConfig = networkInterface.AccessConfigs[0]
+		address = accessConfig.NatIP
 	}
-	accessConfig := networkInterface.AccessConfigs[0]
 	// get instance network interface access config name
 	accessConfigName := accessConfig.Name
 	// delete instance network interface access config
 	a.logger.WithFields(logrus.Fields{
 		"instance": instance.Name,
-		"address":  accessConfig.NatIP,
+		"address":  address,
 	}).Infof("deleting public IP address from instance")
-	op, err := a.addressManager.DeleteAccessConfig(a.project, zone, instance.Name, accessConfigName, networkInterface.Name)
+	op, err := a.addressManager.DeleteAccessConfig(a.project, zone, instance.Name, accessConfigName, networkInterface.Name, networkInterface.Fingerprint)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete access config %s from instance %s", accessConfigName, instance.Name)
 	}
@@ -171,12 +188,33 @@ func (a *gcpAssigner) deleteInstanceAddress(ctx context.Context, instance *compu
 }
 
 func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error {
+	// Check if the instance has at least one network interface
+	if len(instance.NetworkInterfaces) == 0 {
+		a.logger.WithField("instance", instance.Name).Info("instance has no network interfaces")
+		return nil
+	}
+	// get instance network interface
+	networkInterface := instance.NetworkInterfaces[0]
+
 	// empty address means ephemeral public IP address
-	natIP := ""
-	name := defaultNetworkName
+	ip := ""
+	name := networkInterface.Name
+	ipVer := "IPV4"
+	networkTier := "PREMIUM"
+	accessConfigType := defaultAccessConfigType
+	prefixLength := int64(0)
+	if a.ipv6 {
+		ipVer = "IPV6"
+		name = defaultNetworkNameIPv6
+		accessConfigType = defaultAccessConfigIPv6Type
+		prefixLength = defaultPrefixLength
+	}
+
 	kind := "ephemeral"
 	if address != nil {
-		natIP = address.Address
+		ip = address.Address
+		ipVer = address.IpVersion
+		networkTier = address.NetworkTier
 		name = address.Name
 		kind = "static"
 	}
@@ -184,15 +222,23 @@ func (a *gcpAssigner) addInstanceAddress(ctx context.Context, instance *compute.
 	a.logger.WithFields(logrus.Fields{
 		"instance":     instance.Name,
 		"address-name": name,
-		"address-ip":   natIP,
+		"address-ip":   ip,
+		"ip-version":   ipVer,
 		"kind":         kind,
 	}).Info("adding public IP address to instance")
-	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, defaultNetworkInterface, &compute.AccessConfig{
-		Name:  name,
-		Type:  accessConfigType,
-		Kind:  accessConfigKind,
-		NatIP: natIP,
-	})
+	accessConfig := &compute.AccessConfig{
+		Name: name,
+		Type: accessConfigType,
+		Kind: accessConfigKind,
+	}
+	if a.ipv6 {
+		accessConfig.ExternalIpv6 = ip
+		accessConfig.NetworkTier = networkTier
+		accessConfig.ExternalIpv6PrefixLength = prefixLength
+	} else {
+		accessConfig.NatIP = ip
+	}
+	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, networkInterface.Name, networkInterface.Fingerprint, accessConfig)
 	if err != nil {
 		return errors.Wrapf(err, "failed to add access config %s to instance %s", name, instance.Name)
 	}
@@ -261,6 +307,12 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 		return errors.Wrap(err, "failed to delete current public IP address")
 	}
 
+	// get instance details again to refresh the network interface fingerprint (required for adding a new ipv6 address)
+	instance, err = a.instanceGetter.Get(a.project, zone, instanceID)
+	if err != nil {
+		return errors.Wrapf(err, "failed refresh network interface fingerprint for instance %s", instanceID)
+	}
+
 	// try to assign all available addresses until one succeeds
 	// due to concurrency, it is possible that another kubeip instance will assign the same address
 	for _, address := range addresses {
@@ -298,6 +350,11 @@ func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]
 	filters := []string{
 		fmt.Sprintf("(status=%s)", status),
 		"(addressType=EXTERNAL)",
+	}
+	if a.ipv6 {
+		filters = append(filters, "(ipVersion=IPV6)")
+	} else {
+		filters = append(filters, "(ipVersion!=IPV6)")
 	}
 
 	// filter addresses by provided filter: labels.key=value
@@ -348,6 +405,11 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 					// assign ephemeral public IP address to the instance (pass nil address)
 					for {
 						// retry until ephemeral public IP address is assigned
+						instance, err = a.instanceGetter.Get(a.project, zone, instanceID)
+						if err != nil {
+							a.logger.WithError(err).Errorf("failed to get instance %s, retrying", instanceID)
+							continue
+						}
 						// sometime this operation fails and needs to be retried
 						if err = a.addInstanceAddress(ctx, instance, zone, nil); err != nil {
 							a.logger.WithError(err).Error("failed to assign ephemeral public IP address, retrying")

@@ -41,7 +41,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (test-filter-1) (test-filter-2)").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall)
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
@@ -71,7 +71,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (test-filter-1) (test-filter-2)").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall)
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
@@ -282,7 +282,8 @@ func Test_gcpAssigner_deleteInstanceAddress(t *testing.T) {
 					mock := mocks.NewAddressManager(t)
 					networkInterfaceName := args.instance.NetworkInterfaces[0].Name
 					accessConfigName := args.instance.NetworkInterfaces[0].AccessConfigs[0].Name
-					mock.EXPECT().DeleteAccessConfig("test-project", "", args.instance.Name, accessConfigName, networkInterfaceName).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					fingerprint := args.instance.NetworkInterfaces[0].Fingerprint
+					mock.EXPECT().DeleteAccessConfig("test-project", "", args.instance.Name, accessConfigName, networkInterfaceName, fingerprint).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
 					return mock
 				},
 			},
@@ -297,6 +298,7 @@ func Test_gcpAssigner_deleteInstanceAddress(t *testing.T) {
 							AccessConfigs: []*compute.AccessConfig{
 								{Name: "test-access-config", NatIP: "100.0.0.1"},
 							},
+							Fingerprint: "test-fingerprint",
 						},
 					},
 				},
@@ -349,14 +351,14 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL)").Return(mockCall).Once()
+					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL) (ipVersion=IPV4)").Return(mockCall).Once()
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
 							{Name: "test-address-1", Status: inUseStatus, Address: "100.0.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-1"}},
 							{Name: "test-address-2", Status: inUseStatus, Address: "100.0.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-2"}},
 						},
 					}, nil).Once()
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall).Once()
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
@@ -375,8 +377,9 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 							{
 								Name: "test-network-interface",
 								AccessConfigs: []*compute.AccessConfig{
-									{Name: "test-access-config", NatIP: "200.0.0.1", Type: accessConfigType, Kind: accessConfigKind},
+									{Name: "test-access-config", NatIP: "200.0.0.1", Type: defaultAccessConfigType, Kind: accessConfigKind},
 								},
+								Fingerprint: "test-fingerprint",
 							},
 						},
 					}, nil)
@@ -384,10 +387,10 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 				},
 				addressManagerFn: func(t *testing.T) cloud.AddressManager {
 					mock := mocks.NewAddressManager(t)
-					mock.EXPECT().DeleteAccessConfig("test-project", "test-zone", "test-instance-0", "test-access-config", "test-network-interface").Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
-					mock.EXPECT().AddAccessConfig("test-project", "test-zone", "test-instance-0", defaultNetworkInterface, &compute.AccessConfig{
+					mock.EXPECT().DeleteAccessConfig("test-project", "test-zone", "test-instance-0", "test-access-config", "test-network-interface", "test-fingerprint").Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
+					mock.EXPECT().AddAccessConfig("test-project", "test-zone", "test-instance-0", "test-network-interface", "test-fingerprint", &compute.AccessConfig{
 						Name:  "test-address-3",
-						Type:  accessConfigType,
+						Type:  defaultAccessConfigType,
 						Kind:  accessConfigKind,
 						NatIP: "100.0.0.3",
 					}).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)

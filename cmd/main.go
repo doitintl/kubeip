@@ -210,6 +210,12 @@ func main() {
 						EnvVars:  []string{"REGION"},
 						Category: "Configuration",
 					},
+					&cli.BoolFlag{
+						Name:     "ipv6",
+						Usage:    "enable IPv6 support",
+						EnvVars:  []string{"IPV6"},
+						Category: "Configuration",
+					},
 					&cli.PathFlag{
 						Name:     "kubeconfig",
 						Usage:    "path to Kubernetes configuration file (not needed if running in node)",

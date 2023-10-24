@@ -46,3 +46,8 @@ variable "machine_type" {
   type    = string
   default = "e2-medium"
 }
+
+variable "ipv6_support" {
+  type    = bool
+  default = false
+}
