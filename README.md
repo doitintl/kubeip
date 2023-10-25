@@ -39,7 +39,7 @@ Deploy KubeIP as a DaemonSet on your desired nodes using standard
 Kubernetes [mechanism](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/). Once deployed, KubeIP will assign a static
 public IP
 to each node it operates on. If no static public IP is available, KubeIP will wait until one becomes available. When a node is deleted,
-KubeIP will release the static public IP.
+KubeIP will release the static public IP and reassign ephemeral public IP to the node.
 
 ### IPv6 Support
 

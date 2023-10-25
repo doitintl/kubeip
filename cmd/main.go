@@ -280,7 +280,7 @@ func main() {
 			},
 		},
 		Name:    "kubeip-agent",
-		Usage:   "replaces the node's public IP address with a static public IP address",
+		Usage:   "replaces the node's public IP address with a static public IP (IPv4/IPv6) address",
 		Version: version,
 	}
 	cli.VersionPrinter = func(c *cli.Context) {

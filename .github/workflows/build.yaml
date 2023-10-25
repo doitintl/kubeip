@@ -44,9 +44,9 @@ jobs:
           name: test-reports
           if-no-files-found: ignore
           path: |
+            golangci-lint.out
             test-report.out
             coverage.out
-            golangci-lint.out
 
       - name: SonarCloud scan
         uses: SonarSource/sonarcloud-github-action@master
