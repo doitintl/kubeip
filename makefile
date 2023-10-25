@@ -57,7 +57,7 @@ lint: setup-lint; $(info $(M) running golangci-lint ...) @ ## run golangci-lint 
 	$Q cat golangci-lint.out
 
 mock: setup-mockery ; $(info $(M) running mockery ...) @ ## run mockery to generate mocks
-	$Q $(GOMOCK) --dir internal --all --keeptree --with-expecter
+	$Q $(GOMOCK) --dir internal --all --keeptree --with-expecter --exported
 
 test: ; $(info $(M) running test ...) @ ## run tests with coverage
 	$Q $(GOCMD) fmt ./...

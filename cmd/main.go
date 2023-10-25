@@ -182,6 +182,7 @@ func runCmd(c *cli.Context) error {
 	return nil
 }
 
+//nolint:funlen
 func main() {
 	app := &cli.App{
 		// use ";" instead of "," for slice flag separator

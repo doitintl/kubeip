@@ -43,7 +43,7 @@ KubeIP will release the static public IP.
 
 ### IPv6 Support
 
-KubeIP supports dual-stack IPv4/IPv6 clusters and public static IPv6 addresses.
+KubeIP supports dual-stack IPv4/IPv6 GKE clusters and Google Cloud static public IPv6 addresses.
 To enable IPv6 support, set the `ipv6` flag (or set `IPV6` environment variable) to `true` (default is `false`).
 
 ### Kubernetes Service Account

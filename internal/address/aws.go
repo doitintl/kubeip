@@ -41,7 +41,7 @@ func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (A
 	// initialize AWS elastic IP lister
 	eipLister := cloud.NewEipLister(client)
 
-	// initialize AWS elastic IP assigner
+	// initialize AWS elastic IP internalAssigner
 	eipAssigner := cloud.NewEipAssigner(client)
 
 	return &awsAssigner{
@@ -165,7 +165,7 @@ func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationI
 	return false, nil
 }
 
-//nolint:funlen,gocyclo
+//nolint:funlen,gocyclo,gocognit
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) error {
 	// get elastic IP attached to the instance
 	filters := make(map[string][]string)

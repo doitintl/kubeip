@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/doitintl/kubeip/internal/cloud"
+	amock "github.com/doitintl/kubeip/mocks/address"
 	mocks "github.com/doitintl/kubeip/mocks/cloud"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -41,7 +42,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall)
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
@@ -71,7 +72,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall)
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
@@ -314,8 +315,8 @@ func Test_gcpAssigner_deleteInstanceAddress(t *testing.T) {
 				region:         tt.fields.region,
 				logger:         logger,
 			}
-			if err := a.deleteInstanceAddress(tt.args.ctx, tt.args.instance, tt.args.zone); (err != nil) != tt.wantErr {
-				t.Errorf("deleteInstanceAddress() error = %v, wantErr %v", err, tt.wantErr)
+			if err := a.DeleteInstanceAddress(tt.args.ctx, tt.args.instance, tt.args.zone); (err != nil) != tt.wantErr {
+				t.Errorf("DeleteInstanceAddress() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -351,19 +352,19 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
-					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL) (ipVersion=IPV4)").Return(mockCall).Once()
+					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL) (ipVersion!=IPV6)").Return(mockCall).Once()
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
-							{Name: "test-address-1", Status: inUseStatus, Address: "100.0.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-1"}},
-							{Name: "test-address-2", Status: inUseStatus, Address: "100.0.0.2", NetworkTier: "PREMIUM", AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-2"}},
+							{Name: "test-address-1", Status: inUseStatus, Address: "100.0.0.1", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-1"}},
+							{Name: "test-address-2", Status: inUseStatus, Address: "100.0.0.2", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-2"}},
 						},
 					}, nil).Once()
-					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion=IPV4) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
+					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
 					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall).Once()
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
-							{Name: "test-address-3", Status: reservedStatus, Address: "100.0.0.3", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
-							{Name: "test-address-4", Status: reservedStatus, Address: "100.0.0.4", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
+							{Name: "test-address-3", Status: reservedStatus, Address: "100.0.0.3", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL"},
+							{Name: "test-address-4", Status: reservedStatus, Address: "100.0.0.4", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL"},
 						},
 					}, nil).Once()
 					return mock
@@ -389,7 +390,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 					mock := mocks.NewAddressManager(t)
 					mock.EXPECT().DeleteAccessConfig("test-project", "test-zone", "test-instance-0", "test-access-config", "test-network-interface", "test-fingerprint").Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
 					mock.EXPECT().AddAccessConfig("test-project", "test-zone", "test-instance-0", "test-network-interface", "test-fingerprint", &compute.AccessConfig{
-						Name:  "test-address-3",
+						Name:  defaultNetworkName,
 						Type:  defaultAccessConfigType,
 						Kind:  accessConfigKind,
 						NatIP: "100.0.0.3",
@@ -420,6 +421,341 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 			}
 			if err := a.Assign(tt.args.ctx, tt.args.instanceID, tt.args.zone, tt.args.filter, tt.args.orderBy); (err != nil) != tt.wantErr {
 				t.Errorf("Assign() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_createAccessConfig(t *testing.T) {
+	type args struct {
+		address *compute.Address
+		ipv6    bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want *compute.AccessConfig
+	}{
+		{
+			name: "create access config for IPv4 address",
+			args: args{
+				address: &compute.Address{
+					Name:    "test-address",
+					Address: "100.0.0.1",
+				},
+			},
+			want: &compute.AccessConfig{
+				Name:  defaultNetworkName,
+				Type:  defaultAccessConfigType,
+				Kind:  accessConfigKind,
+				NatIP: "100.0.0.1",
+			},
+		},
+		{
+			name: "create access config for IPv6 address",
+			args: args{
+				address: &compute.Address{
+					Name:         "test-address",
+					Address:      "2001:db8::1",
+					PrefixLength: 128,
+					NetworkTier:  "TEST",
+				},
+				ipv6: true,
+			},
+			want: &compute.AccessConfig{
+				Name:                     defaultNetworkNameIPv6,
+				Type:                     defaultAccessConfigIPv6Type,
+				Kind:                     accessConfigKind,
+				ExternalIpv6:             "2001:db8::1",
+				NetworkTier:              "TEST",
+				ExternalIpv6PrefixLength: 128,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := createAccessConfig(tt.args.address, tt.args.ipv6); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("createAccessConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getNetworkInterface(t *testing.T) {
+	type args struct {
+		instance *compute.Instance
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *compute.NetworkInterface
+		wantErr bool
+	}{
+		{
+			name: "get network interface successfully",
+			args: args{
+				instance: &compute.Instance{
+					Name: "test-instance",
+					NetworkInterfaces: []*compute.NetworkInterface{
+						{Name: "test-network-interface"},
+					},
+				},
+			},
+			want: &compute.NetworkInterface{Name: "test-network-interface"},
+		},
+		{
+			name: "get network interface with error",
+			args: args{
+				instance: &compute.Instance{
+					Name: "test-instance",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "get first network interface successfully",
+			args: args{
+				instance: &compute.Instance{
+					Name: "test-instance",
+					NetworkInterfaces: []*compute.NetworkInterface{
+						{Name: "test-network-interface-1"},
+						{Name: "test-network-interface-2"},
+					},
+				},
+			},
+			want: &compute.NetworkInterface{Name: "test-network-interface-1"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getNetworkInterface(tt.args.instance)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getNetworkInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getNetworkInterface() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_getAccessConfig(t *testing.T) {
+	type args struct {
+		networkInterface *compute.NetworkInterface
+		ipv6             bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *compute.AccessConfig
+		wantErr bool
+	}{
+		{
+			name: "get access config successfully",
+			args: args{
+				networkInterface: &compute.NetworkInterface{
+					Name: "test-network-interface",
+					AccessConfigs: []*compute.AccessConfig{
+						{Name: "test-access-config"},
+					},
+				},
+			},
+			want: &compute.AccessConfig{Name: "test-access-config"},
+		},
+		{
+			name: "get access config ipv6 successfully",
+			args: args{
+				networkInterface: &compute.NetworkInterface{
+					Name: "test-network-interface",
+					Ipv6AccessConfigs: []*compute.AccessConfig{
+						{Name: "test-access-config"},
+					},
+				},
+				ipv6: true,
+			},
+			want: &compute.AccessConfig{Name: "test-access-config"},
+		},
+		{
+			name: "no network interface error",
+			args: args{
+				networkInterface: &compute.NetworkInterface{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "no access config error",
+			args: args{
+				networkInterface: &compute.NetworkInterface{
+					Name: "test-network-interface",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "no access config ipv6 error",
+			args: args{
+				networkInterface: &compute.NetworkInterface{
+					Name: "test-network-interface",
+				},
+				ipv6: true,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getAccessConfig(tt.args.networkInterface, tt.args.ipv6)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getAccessConfig() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getAccessConfig() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_retryAddEphemeralAddress(t *testing.T) {
+	type args struct {
+		asFn     func(t *testing.T) internalAssigner
+		instance *compute.Instance
+		zone     string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "retry add ephemeral address successfully",
+			args: args{
+				zone: "test-zone",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(nil)
+					return mock
+				},
+			},
+		},
+		{
+			name: "retry add ephemeral address with error",
+			args: args{
+				zone: "test-zone",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(errors.New("test-error")).Times(3)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(nil)
+					return mock
+				},
+			},
+		},
+		{
+			name: "retry add ephemeral address with error and max retries reached",
+			args: args{
+				zone: "test-zone",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(errors.New("test-error")).Times(maxRetries)
+					return mock
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := retryAddEphemeralAddress(context.TODO(), logrus.NewEntry(logrus.New()), tt.args.asFn(t), tt.args.instance, tt.args.zone); (err != nil) != tt.wantErr {
+				t.Errorf("retryAddEphemeralAddress() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_tryAssignAddress(t *testing.T) {
+	type args struct {
+		asFn     func(t *testing.T) internalAssigner
+		instance *compute.Instance
+		region   string
+		zone     string
+		address  *compute.Address
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "try assign address successfully",
+			args: args{
+				zone:   "test-zone",
+				region: "test-region",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().CheckAddressAssigned("test-region", "test-address").Return(false, nil)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(nil)
+					return mock
+				},
+				address: &compute.Address{
+					Name: "test-address",
+				},
+			},
+		},
+		{
+			name: "try assign address already assigned",
+			args: args{
+				zone:   "test-zone",
+				region: "test-region",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().CheckAddressAssigned("test-region", "test-address").Return(true, nil)
+					return mock
+				},
+				address: &compute.Address{
+					Name: "test-address",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "try assign address with check error",
+			args: args{
+				zone:   "test-zone",
+				region: "test-region",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().CheckAddressAssigned("test-region", "test-address").Return(false, errors.New("test-error"))
+					return mock
+				},
+				address: &compute.Address{
+					Name: "test-address",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "try assign address with add assign error",
+			args: args{
+				zone:   "test-zone",
+				region: "test-region",
+				asFn: func(t *testing.T) internalAssigner {
+					mock := amock.NewInternalAssigner(t)
+					mock.EXPECT().CheckAddressAssigned("test-region", "test-address").Return(false, nil)
+					mock.EXPECT().AddInstanceAddress(context.TODO(), tmock.Anything, "test-zone", tmock.Anything).Return(errors.New("test-error"))
+					return mock
+				},
+				address: &compute.Address{
+					Name: "test-address",
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tryAssignAddress(context.TODO(), tt.args.asFn(t), tt.args.instance, tt.args.region, tt.args.zone, tt.args.address); (err != nil) != tt.wantErr {
+				t.Errorf("tryAssignAddress() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
