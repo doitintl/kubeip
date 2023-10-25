@@ -165,7 +165,7 @@ func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationI
 	return false, nil
 }
 
-//nolint:funlen,gocyclo,gocognit
+//nolint:gocognit,funlen,gocyclo
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) error {
 	// get elastic IP attached to the instance
 	filters := make(map[string][]string)

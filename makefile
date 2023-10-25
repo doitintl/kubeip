@@ -54,7 +54,6 @@ lint: setup-lint; $(info $(M) running golangci-lint ...) @ ## run golangci-lint 
 	# updating path since golangci-lint is looking for go binary and this may lead to
 	# conflict when multiple go versions are installed
 	$Q $(GOLINT) run -v -c $(LINT_CONFIG) --out-format checkstyle ./... > golangci-lint.out
-	$Q cat golangci-lint.out
 
 mock: setup-mockery ; $(info $(M) running mockery ...) @ ## run mockery to generate mocks
 	$Q $(GOMOCK) --dir internal --all --keeptree --with-expecter --exported
