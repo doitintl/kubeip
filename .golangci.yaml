@@ -19,6 +19,8 @@ linters-settings:
     check-shadowing: true
   gocyclo:
     min-complexity: 15
+  gocognit:
+    min-complexity: 35
   maligned:
     suggest-new: true
   dupl:
