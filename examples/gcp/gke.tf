@@ -298,7 +298,7 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
             name  = "LOG_LEVEL"
             value = "debug"
           }
-          evn {
+          env {
             name  = "LOG_JSON"
             value = "true"
           }
