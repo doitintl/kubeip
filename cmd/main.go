@@ -182,6 +182,7 @@ func runCmd(c *cli.Context) error {
 	return nil
 }
 
+//nolint:funlen
 func main() {
 	app := &cli.App{
 		// use ";" instead of "," for slice flag separator
@@ -208,6 +209,12 @@ func main() {
 						Name:     "region",
 						Usage:    "name of the GCP region or the AWS region (not needed if running in node)",
 						EnvVars:  []string{"REGION"},
+						Category: "Configuration",
+					},
+					&cli.BoolFlag{
+						Name:     "ipv6",
+						Usage:    "enable IPv6 support",
+						EnvVars:  []string{"IPV6"},
 						Category: "Configuration",
 					},
 					&cli.PathFlag{

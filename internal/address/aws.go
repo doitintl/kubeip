@@ -41,7 +41,7 @@ func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (A
 	// initialize AWS elastic IP lister
 	eipLister := cloud.NewEipLister(client)
 
-	// initialize AWS elastic IP assigner
+	// initialize AWS elastic IP internalAssigner
 	eipAssigner := cloud.NewEipAssigner(client)
 
 	return &awsAssigner{

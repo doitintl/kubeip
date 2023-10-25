@@ -20,25 +20,25 @@ func (_m *AddressManager) EXPECT() *AddressManager_Expecter {
 	return &AddressManager_Expecter{mock: &_m.Mock}
 }
 
-// AddAccessConfig provides a mock function with given fields: project, zone, instance, networkInterface, accessconfig
-func (_m *AddressManager) AddAccessConfig(project string, zone string, instance string, networkInterface string, accessconfig *compute.AccessConfig) (*compute.Operation, error) {
-	ret := _m.Called(project, zone, instance, networkInterface, accessconfig)
+// AddAccessConfig provides a mock function with given fields: project, zone, instance, networkInterface, fingerprint, accessconfig
+func (_m *AddressManager) AddAccessConfig(project string, zone string, instance string, networkInterface string, fingerprint string, accessconfig *compute.AccessConfig) (*compute.Operation, error) {
+	ret := _m.Called(project, zone, instance, networkInterface, fingerprint, accessconfig)
 
 	var r0 *compute.Operation
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, *compute.AccessConfig) (*compute.Operation, error)); ok {
-		return rf(project, zone, instance, networkInterface, accessconfig)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, *compute.AccessConfig) (*compute.Operation, error)); ok {
+		return rf(project, zone, instance, networkInterface, fingerprint, accessconfig)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, *compute.AccessConfig) *compute.Operation); ok {
-		r0 = rf(project, zone, instance, networkInterface, accessconfig)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, *compute.AccessConfig) *compute.Operation); ok {
+		r0 = rf(project, zone, instance, networkInterface, fingerprint, accessconfig)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*compute.Operation)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string, *compute.AccessConfig) error); ok {
-		r1 = rf(project, zone, instance, networkInterface, accessconfig)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, string, *compute.AccessConfig) error); ok {
+		r1 = rf(project, zone, instance, networkInterface, fingerprint, accessconfig)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -56,14 +56,15 @@ type AddressManager_AddAccessConfig_Call struct {
 //   - zone string
 //   - instance string
 //   - networkInterface string
+//   - fingerprint string
 //   - accessconfig *compute.AccessConfig
-func (_e *AddressManager_Expecter) AddAccessConfig(project interface{}, zone interface{}, instance interface{}, networkInterface interface{}, accessconfig interface{}) *AddressManager_AddAccessConfig_Call {
-	return &AddressManager_AddAccessConfig_Call{Call: _e.mock.On("AddAccessConfig", project, zone, instance, networkInterface, accessconfig)}
+func (_e *AddressManager_Expecter) AddAccessConfig(project interface{}, zone interface{}, instance interface{}, networkInterface interface{}, fingerprint interface{}, accessconfig interface{}) *AddressManager_AddAccessConfig_Call {
+	return &AddressManager_AddAccessConfig_Call{Call: _e.mock.On("AddAccessConfig", project, zone, instance, networkInterface, fingerprint, accessconfig)}
 }
 
-func (_c *AddressManager_AddAccessConfig_Call) Run(run func(project string, zone string, instance string, networkInterface string, accessconfig *compute.AccessConfig)) *AddressManager_AddAccessConfig_Call {
+func (_c *AddressManager_AddAccessConfig_Call) Run(run func(project string, zone string, instance string, networkInterface string, fingerprint string, accessconfig *compute.AccessConfig)) *AddressManager_AddAccessConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(*compute.AccessConfig))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(*compute.AccessConfig))
 	})
 	return _c
 }
@@ -73,30 +74,30 @@ func (_c *AddressManager_AddAccessConfig_Call) Return(_a0 *compute.Operation, _a
 	return _c
 }
 
-func (_c *AddressManager_AddAccessConfig_Call) RunAndReturn(run func(string, string, string, string, *compute.AccessConfig) (*compute.Operation, error)) *AddressManager_AddAccessConfig_Call {
+func (_c *AddressManager_AddAccessConfig_Call) RunAndReturn(run func(string, string, string, string, string, *compute.AccessConfig) (*compute.Operation, error)) *AddressManager_AddAccessConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// DeleteAccessConfig provides a mock function with given fields: project, zone, instance, accessConfig, networkInterface
-func (_m *AddressManager) DeleteAccessConfig(project string, zone string, instance string, accessConfig string, networkInterface string) (*compute.Operation, error) {
-	ret := _m.Called(project, zone, instance, accessConfig, networkInterface)
+// DeleteAccessConfig provides a mock function with given fields: project, zone, instance, accessConfig, networkInterface, fingerprint
+func (_m *AddressManager) DeleteAccessConfig(project string, zone string, instance string, accessConfig string, networkInterface string, fingerprint string) (*compute.Operation, error) {
+	ret := _m.Called(project, zone, instance, accessConfig, networkInterface, fingerprint)
 
 	var r0 *compute.Operation
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string) (*compute.Operation, error)); ok {
-		return rf(project, zone, instance, accessConfig, networkInterface)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, string) (*compute.Operation, error)); ok {
+		return rf(project, zone, instance, accessConfig, networkInterface, fingerprint)
 	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string) *compute.Operation); ok {
-		r0 = rf(project, zone, instance, accessConfig, networkInterface)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, string, string) *compute.Operation); ok {
+		r0 = rf(project, zone, instance, accessConfig, networkInterface, fingerprint)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*compute.Operation)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
-		r1 = rf(project, zone, instance, accessConfig, networkInterface)
+	if rf, ok := ret.Get(1).(func(string, string, string, string, string, string) error); ok {
+		r1 = rf(project, zone, instance, accessConfig, networkInterface, fingerprint)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -115,13 +116,14 @@ type AddressManager_DeleteAccessConfig_Call struct {
 //   - instance string
 //   - accessConfig string
 //   - networkInterface string
-func (_e *AddressManager_Expecter) DeleteAccessConfig(project interface{}, zone interface{}, instance interface{}, accessConfig interface{}, networkInterface interface{}) *AddressManager_DeleteAccessConfig_Call {
-	return &AddressManager_DeleteAccessConfig_Call{Call: _e.mock.On("DeleteAccessConfig", project, zone, instance, accessConfig, networkInterface)}
+//   - fingerprint string
+func (_e *AddressManager_Expecter) DeleteAccessConfig(project interface{}, zone interface{}, instance interface{}, accessConfig interface{}, networkInterface interface{}, fingerprint interface{}) *AddressManager_DeleteAccessConfig_Call {
+	return &AddressManager_DeleteAccessConfig_Call{Call: _e.mock.On("DeleteAccessConfig", project, zone, instance, accessConfig, networkInterface, fingerprint)}
 }
 
-func (_c *AddressManager_DeleteAccessConfig_Call) Run(run func(project string, zone string, instance string, accessConfig string, networkInterface string)) *AddressManager_DeleteAccessConfig_Call {
+func (_c *AddressManager_DeleteAccessConfig_Call) Run(run func(project string, zone string, instance string, accessConfig string, networkInterface string, fingerprint string)) *AddressManager_DeleteAccessConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
+		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string), args[5].(string))
 	})
 	return _c
 }
@@ -131,7 +133,7 @@ func (_c *AddressManager_DeleteAccessConfig_Call) Return(_a0 *compute.Operation,
 	return _c
 }
 
-func (_c *AddressManager_DeleteAccessConfig_Call) RunAndReturn(run func(string, string, string, string, string) (*compute.Operation, error)) *AddressManager_DeleteAccessConfig_Call {
+func (_c *AddressManager_DeleteAccessConfig_Call) RunAndReturn(run func(string, string, string, string, string, string) (*compute.Operation, error)) *AddressManager_DeleteAccessConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

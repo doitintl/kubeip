@@ -15,6 +15,8 @@ type Config struct {
 	Project string `json:"project"`
 	// Region is the name of the GCP region or the AWS region
 	Region string `json:"region"`
+	// IPv6 support
+	IPv6 bool `json:"ipv6"`
 	// DevelopMode mode
 	DevelopMode bool `json:"develop-mode"`
 	// Filter is the filter for the IP addresses
@@ -40,6 +42,7 @@ func NewConfig(c *cli.Context) *Config {
 	cfg.OrderBy = c.String("order-by")
 	cfg.Project = c.String("project")
 	cfg.Region = c.String("region")
+	cfg.IPv6 = c.Bool("ipv6")
 	cfg.ReleaseOnExit = c.Bool("release-on-exit")
 	return &cfg
 }

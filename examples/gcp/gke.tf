@@ -63,6 +63,8 @@ resource "google_compute_subnetwork" "kubeip_subnet" {
   network                  = google_compute_network.vpc.id
   region                   = var.region
   ip_cidr_range            = var.subnet_range
+  stack_type               = var.ipv6_support ? "IPV4_IPV6" : "IPV4_ONLY"
+  ipv6_access_type         = var.ipv6_support ? "EXTERNAL" : ""
   private_ip_google_access = true
   secondary_ip_range {
     range_name    = var.services_range_name
@@ -82,12 +84,15 @@ resource "google_container_cluster" "kubeip_cluster" {
   initial_node_count       = 1
   remove_default_node_pool = true
 
-  network    = google_compute_network.vpc.id
-  subnetwork = google_compute_subnetwork.kubeip_subnet.id
+  network                  = google_compute_network.vpc.id
+  subnetwork               = google_compute_subnetwork.kubeip_subnet.id
+  datapath_provider        = var.ipv6_support ? "ADVANCED_DATAPATH" : "LEGACY_DATAPATH"
+  enable_l4_ilb_subsetting = true
 
   ip_allocation_policy {
     services_secondary_range_name = var.services_range_name
     cluster_secondary_range_name  = var.pods_range_name
+    stack_type                    = var.ipv6_support ? "IPV4_IPV6" : "IPV4"
   }
 
   # Enable Workload Identity
@@ -172,13 +177,16 @@ resource "google_container_node_pool" "private_node_pool" {
 
 # Create static public IP addresses
 resource "google_compute_address" "static_ip" {
-  provider     = google-beta
-  project      = var.project_id
-  count        = 5
-  name         = "static-ip-${count.index}"
-  address_type = "EXTERNAL"
-  region       = google_container_cluster.kubeip_cluster.location
-  labels       = {
+  provider           = google-beta
+  project            = var.project_id
+  count              = 5
+  name               = "static-ip${var.ipv6_support ? "v6": "v4"}-${count.index}"
+  ip_version         = var.ipv6_support ? "IPV6" : "IPV4"
+  ipv6_endpoint_type = "VM"
+  address_type       = "EXTERNAL"
+  region             = google_container_cluster.kubeip_cluster.location
+  subnetwork         = var.ipv6_support ? google_compute_subnetwork.kubeip_subnet.id : ""
+  labels             = {
     environment = "demo"
     kubeip      = "reserved"
   }

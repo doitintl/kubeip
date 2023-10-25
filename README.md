@@ -41,6 +41,11 @@ public IP
 to each node it operates on. If no static public IP is available, KubeIP will wait until one becomes available. When a node is deleted,
 KubeIP will release the static public IP.
 
+### IPv6 Support
+
+KubeIP supports dual-stack IPv4/IPv6 GKE clusters and Google Cloud static public IPv6 addresses.
+To enable IPv6 support, set the `ipv6` flag (or set `IPV6` environment variable) to `true` (default is `false`).
+
 ### Kubernetes Service Account
 
 KubeIP requires a Kubernetes service account with the following permissions:
@@ -216,6 +221,7 @@ OPTIONS:
    Configuration
 
    --filter value [ --filter value ]  filter for the IP addresses [$FILTER]
+   --ipv6                             enable IPv6 support (default: false) [$IPV6]
    --kubeconfig value                 path to Kubernetes configuration file (not needed if running in node) [$KUBECONFIG]
    --node-name value                  Kubernetes node name (not needed if running in node) [$NODE_NAME]
    --order-by value                   order by for the IP addresses [$ORDER_BY]
@@ -272,4 +278,12 @@ To run the example, follow these steps:
 cd examples/gcp
 terraform init
 terraform apply -var="project_id=<your-project-id>"
+```
+
+To run the example with GKE dual-stack IPv4/IPv6 cluster, follow these steps:
+
+```shell
+cd examples/gcp
+terraform init
+terraform apply -var="project_id=<your-project-id>" -var="ipv6_support=true"
 ```
