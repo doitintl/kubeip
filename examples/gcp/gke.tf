@@ -185,7 +185,7 @@ resource "google_compute_address" "static_ip" {
   ipv6_endpoint_type = "VM"
   address_type       = "EXTERNAL"
   region             = google_container_cluster.kubeip_cluster.location
-  subnetwork         = google_compute_subnetwork.kubeip_subnet.id
+  subnetwork         = var.ipv6_support ? google_compute_subnetwork.kubeip_subnet.id : ""
   labels             = {
     environment = "demo"
     kubeip      = "reserved"
@@ -255,68 +255,68 @@ resource "kubernetes_cluster_role_binding" "kubeip_cluster_role_binding" {
 }
 
 # Deploy KubeIP DaemonSet
-#resource "kubernetes_daemonset" "kubeip_daemonset" {
-#  metadata {
-#    name      = "kubeip-agent"
-#    namespace = "kube-system"
-#    labels    = {
-#      app = "kubeip"
-#    }
-#  }
-#  spec {
-#    selector {
-#      match_labels = {
-#        app = "kubeip"
-#      }
-#    }
-#    template {
-#      metadata {
-#        labels = {
-#          app = "kubeip"
-#        }
-#      }
-#      spec {
-#        service_account_name             = "kubeip-service-account"
-#        termination_grace_period_seconds = 30
-#        priority_class_name              = "system-node-critical"
-#        container {
-#          name  = "kubeip-agent"
-#          image = "doitintl/kubeip-agent"
-#          env {
-#            name = "NODE_NAME"
-#            value_from {
-#              field_ref {
-#                field_path = "spec.nodeName"
-#              }
-#            }
-#          }
-#          env {
-#            name  = "FILTER"
-#            value = "labels.kubeip=reserved;labels.environment=demo"
-#          }
-#          env {
-#            name  = "LOG_LEVEL"
-#            value = "debug"
-#          }
-#          evn {
-#            name  = "LOG_JSON"
-#            value = "true"
-#          }
-#          resources {
-#            requests = {
-#              cpu = "100m"
-#            }
-#          }
-#        }
-#        node_selector = {
-#          nodegroup = "public"
-#          kubeip    = "use"
-#        }
-#      }
-#    }
-#  }
-#  depends_on = [
-#    kubernetes_service_account.kubeip_service_account,
-#    google_container_cluster.kubeip_cluster
-#  ]
-#}
+resource "kubernetes_daemonset" "kubeip_daemonset" {
+  metadata {
+    name      = "kubeip-agent"
+    namespace = "kube-system"
+    labels    = {
+      app = "kubeip"
+    }
+  }
+  spec {
+    selector {
+      match_labels = {
+        app = "kubeip"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "kubeip"
+        }
+      }
+      spec {
+        service_account_name             = "kubeip-service-account"
+        termination_grace_period_seconds = 30
+        priority_class_name              = "system-node-critical"
+        container {
+          name  = "kubeip-agent"
+          image = "doitintl/kubeip-agent"
+          env {
+            name = "NODE_NAME"
+            value_from {
+              field_ref {
+                field_path = "spec.nodeName"
+              }
+            }
+          }
+          env {
+            name  = "FILTER"
+            value = "labels.kubeip=reserved;labels.environment=demo"
+          }
+          env {
+            name  = "LOG_LEVEL"
+            value = "debug"
+          }
+          evn {
+            name  = "LOG_JSON"
+            value = "true"
+          }
+          resources {
+            requests = {
+              cpu = "100m"
+            }
+          }
+        }
+        node_selector = {
+          nodegroup = "public"
+          kubeip    = "use"
+        }
+      }
+    }
+  }
+  depends_on = [
+    kubernetes_service_account.kubeip_service_account,
+    google_container_cluster.kubeip_cluster
+  ]
+}
