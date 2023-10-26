@@ -58,7 +58,7 @@ metadata:
   namespace: kube-system
 ---
 
-piVersion: rbac.authorization.k8s.io/v1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: kubeip-cluster-role
