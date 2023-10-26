@@ -212,20 +212,9 @@ func (a *gcpAssigner) CheckAddressAssigned(region, addressName string) (bool, er
 
 func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error {
 	// check if instance already has a public static IP address assigned
-	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
+	instance, err := a.checkStaticIPAssigned(zone, instanceID)
 	if err != nil {
-		return errors.Wrapf(err, "failed to get instance %s", instanceID)
-	}
-	assigned, err := a.listAddresses(nil, "", inUseStatus)
-	if err != nil {
-		return errors.Wrap(err, "failed to list assigned addresses")
-	}
-	// create a map of users for quick lookup
-	users := a.createUserMap(assigned)
-	// check if the instance's self link is in the list of users
-	if _, ok := users[instance.SelfLink]; ok {
-		a.logger.WithField("instance", instanceID).Infof("instance already has a public IP address assigned")
-		return nil
+		return errors.Wrapf(err, "check if static public IP is already assigned to instance %s", instanceID)
 	}
 
 	// get available reserved public IP addresses
@@ -268,6 +257,24 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 		return errors.Wrap(err, "failed to assign static public IP address")
 	}
 	return nil
+}
+
+func (a *gcpAssigner) checkStaticIPAssigned(zone, instanceID string) (*compute.Instance, error) {
+	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get instance %s", instanceID)
+	}
+	assigned, err := a.listAddresses(nil, "", inUseStatus)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list assigned addresses")
+	}
+	// create a map of users for quick lookup
+	users := a.createUserMap(assigned)
+	// check if the instance's self link is in the list of users
+	if _, ok := users[instance.SelfLink]; ok {
+		return nil, ErrStaticIPAlreadyAssigned
+	}
+	return instance, nil
 }
 
 func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]*compute.Address, error) {
@@ -318,6 +325,9 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 	assigned, err := a.listAddresses(nil, "", inUseStatus)
 	if err != nil {
 		return errors.Wrap(err, "failed to list assigned addresses")
+	}
+	if len(assigned) == 0 {
+		return ErrNoStaticIPAssigned
 	}
 
 	// create a map of users for quick lookup

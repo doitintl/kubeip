@@ -89,6 +89,10 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 
 	for {
 		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
+		if err != nil && errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
+			log.Infof("static public IP address already assigned to node instance %s", node.Instance)
+			return nil
+		}
 		if err != nil {
 			log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
 			if retryCounter < cfg.RetryAttempts {
@@ -105,9 +109,8 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 				return errors.Wrap(err, "context is done")
 			}
 		}
-		break
+		return nil
 	}
-	return nil
 }
 
 func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
