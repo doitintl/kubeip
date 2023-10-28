@@ -10,7 +10,9 @@ import (
 )
 
 var (
-	ErrUnknownCloudProvider = errors.New("unknown cloud provider")
+	ErrUnknownCloudProvider    = errors.New("unknown cloud provider")
+	ErrStaticIPAlreadyAssigned = errors.New("static public IP already assigned")
+	ErrNoStaticIPAssigned      = errors.New("no static public IP assigned")
 )
 
 type Assigner interface {

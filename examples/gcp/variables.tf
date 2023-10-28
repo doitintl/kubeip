@@ -51,3 +51,8 @@ variable "ipv6_support" {
   type    = bool
   default = false
 }
+
+variable "kubeip_version" {
+  type    = string
+  default = "latest"
+}
