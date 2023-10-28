@@ -37,3 +37,8 @@ variable "kubernetes_version" {
   type    = string
   default = "1.28"
 }
+
+variable "kubeip_version" {
+  type    = string
+  default = "latest"
+}

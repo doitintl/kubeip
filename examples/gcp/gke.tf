@@ -281,7 +281,7 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         priority_class_name              = "system-node-critical"
         container {
           name  = "kubeip-agent"
-          image = "doitintl/kubeip-agent"
+          image = "doitintl/kubeip-agent:${var.kubeip_version}"
           env {
             name = "NODE_NAME"
             value_from {
