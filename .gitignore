@@ -1,5 +1,6 @@
 # code coverage
 .cover
+coverage.out
 
 # git repo
 .git
@@ -10,6 +11,13 @@
 
 # binaries
 .bin
+.run
+
+# examples
+examples
+
+# linter
+golangci-lint.out
 
 # env customization
 .env
@@ -17,3 +25,10 @@
 
 # Test binary, build with `go test -c`
 *.test
+test-report.out
+
+# SonarQube
+.scannerwork
+
+# temp
+.DS_Store

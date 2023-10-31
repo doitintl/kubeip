@@ -422,8 +422,9 @@ func AddTagIfMissing(projectID string, instance string, zone string, config *cfg
 			ip = config.NatIP
 		}
 	}
-	if isAddressReserved(ip, zone[:len(zone)-2], projectID, config) {
-		addressDetails, err := getAddressDetails(ip, zone, projectID, config)
+	region := zone[:len(zone)-2]
+	if isAddressReserved(ip, region, projectID, config) {
+		addressDetails, err := getAddressDetails(ip, region, projectID, config)
 		if err != nil {
 			return
 		}
