@@ -1,0 +1,27 @@
+{{- if .Release.IsInstall }}
+🎉 KubeIP v2 Deployment Successful! 🎉
+
+Thank you for installing KubeIP v2, ensuring that your Kubernetes nodes are now equipped with static public IP addresses for improved connectivity and reliability.
+
+Next Steps:
+
+1. Verify the Operation: Ensure that KubeIP is running successfully on all desired nodes. You can check the status of the DaemonSet by running:
+   
+   $ kubectl get daemonset kubeip -n kube-system
+
+2. Check IP Assignment: Ensure that static public IPs are assigned to your nodes. Run the following command to see the assigned IPs:
+   
+   $ kubectl get nodes -o wide
+   
+3. Review Logs (Optional): If you want to delve deeper or troubleshoot, you can review the logs of the KubeIP pods:
+   
+   $ kubectl logs -l app=kubeip -n kube-system
+   
+4. Update Your Firewall Rules: If you have specific firewall rules or IP whitelists, ensure they are updated to include the static IPs assigned to your nodes.
+
+5. Documentation and Support: For more information on configuration options, troubleshooting, and usage, please visit the [official KubeIP repository](https://github.com/doitintl/kubeip).
+
+6. Feedback and Contributions: Your feedback is valuable! If you encounter any issues, or if you have suggestions for improvements, please feel free to open an issue or contribute to the project on GitHub.
+
+Enjoy the enhanced stability and connectivity that KubeIP brings to your Kubernetes cluster! 🚀
+{{- end }}
