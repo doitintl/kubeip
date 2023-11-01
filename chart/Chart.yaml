@@ -1,0 +1,4 @@
+apiVersion: v2
+name: kubeip
+description: A Helm chart for KubeIP
+version: 0.1.0
