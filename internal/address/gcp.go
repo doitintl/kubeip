@@ -246,8 +246,12 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	// try to assign all available addresses until one succeeds
 	// due to concurrency, it is possible that another kubeip instance will assign the same address
 	for _, address := range addresses {
+		// check if context is done before trying to assign an address
+		if ctx.Err() != nil {
+			return errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
+		}
 		if err = tryAssignAddress(ctx, a, instance, a.region, zone, address); err != nil {
-			a.logger.WithError(err).Errorf("failed to assign static public IP address %s", address.Address)
+			a.logger.WithError(err).WithField("address", address.Address).Error("failed to assign static public IP address")
 			continue
 		}
 		// break the loop after successfully assigning an address
@@ -400,6 +404,10 @@ func (a *gcpAssigner) createUserMap(assigned []*compute.Address) map[string]stru
 
 func retryAddEphemeralAddress(ctx context.Context, logger *logrus.Entry, as internalAssigner, instance *compute.Instance, zone string) error {
 	for i := 0; i < maxRetries; i++ {
+		// check if context is done before trying to assign an address
+		if ctx.Err() != nil {
+			return errors.Wrap(ctx.Err(), "context cancelled while assigning ephemeral addresses")
+		}
 		if err := as.AddInstanceAddress(ctx, instance, zone, nil); err != nil {
 			logger.WithError(err).Error("failed to assign ephemeral public IP address, retrying")
 			continue
