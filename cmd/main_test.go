@@ -98,6 +98,38 @@ func Test_assignAddress(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "context cancelled while assigning addresses",
+			args: args{
+				c: func() context.Context {
+					ctx, cancel := context.WithCancel(context.Background())
+					go func() {
+						// Simulate a shutdown signal being received after a short delay
+						time.Sleep(20 * time.Millisecond)
+						cancel()
+					}()
+					return ctx
+				}(),
+				assignerFn: func(t *testing.T) address.Assigner {
+					mock := mocks.NewAssigner(t)
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Maybe()
+					return mock
+				},
+				node: &types.Node{
+					Name:     "test-node",
+					Instance: "test-instance",
+					Region:   "test-region",
+					Zone:     "test-zone",
+				},
+				cfg: &config.Config{
+					Filter:        []string{"test-filter"},
+					OrderBy:       "test-order-by",
+					RetryAttempts: 10,
+					RetryInterval: 5 * time.Millisecond,
+				},
+			},
+			wantErr: true,
+		},
+		{
 			name: "error after a few retries and context is done",
 			args: args{
 				c: func() context.Context {

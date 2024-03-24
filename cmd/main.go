@@ -23,7 +23,8 @@ import (
 type contextKey string
 
 const (
-	developModeKey contextKey = "develop-mode"
+	developModeKey  contextKey = "develop-mode"
+	unassignTimeout            = 5 * time.Minute
 )
 
 var (
@@ -81,36 +82,29 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assigner, node *types.Node, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
-	// retry counter
-	retryCounter := 0
+
 	// ticker for retry interval
 	ticker := time.NewTicker(cfg.RetryInterval)
 	defer ticker.Stop()
 
-	for {
+	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
 		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
-		if err != nil && errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
-			log.Infof("static public IP address already assigned to node instance %s", node.Instance)
+		if err == nil || errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 			return nil
 		}
-		if err != nil {
-			log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
-			if retryCounter < cfg.RetryAttempts {
-				retryCounter++
-				log.Infof("retrying after %v", cfg.RetryInterval)
-			} else {
-				log.Infof("reached maximum number of retries (%d)", cfg.RetryAttempts)
-				return errors.Wrap(err, "reached maximum number of retries")
-			}
-			select {
-			case <-ticker.C:
-				continue
-			case <-ctx.Done():
-				return errors.Wrap(err, "context is done")
-			}
+
+		log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
+		log.Infof("retrying after %v", cfg.RetryInterval)
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			// If the context is done, return an error indicating that the operation was cancelled
+			return errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
 		}
-		return nil
 	}
+	return errors.New("reached maximum number of retries")
 }
 
 func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
@@ -145,8 +139,9 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		return errors.Wrap(err, "initializing assigner")
 	}
 	// assign static public IP address
-	errorCh := make(chan error)
+	errorCh := make(chan error, 1) // buffered channel to avoid goroutine leak
 	go func() {
+		defer close(errorCh) // close the channel when the goroutine exits to avoid goroutine leak
 		e := assignAddress(ctx, log, assigner, n, cfg)
 		if e != nil {
 			errorCh <- e
@@ -159,13 +154,16 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 			return errors.Wrap(err, "assigning static public IP address")
 		}
 	case <-ctx.Done():
-		log.Infof("kubeip agent stopped")
+		log.Infof("kubeip agent gracefully stopped")
 		if cfg.ReleaseOnExit {
 			log.Infof("releasing static public IP address")
+			releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout) // release the static public IP address within 5 minutes
+			defer releaseCancel()
 			// use a different context for releasing the static public IP address since the main context is canceled
-			if err = assigner.Unassign(context.Background(), n.Instance, n.Zone); err != nil { //nolint:contextcheck
-				return errors.Wrap(err, "releasing static public IP address")
+			if err = assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil { //nolint:contextcheck
+				return errors.Wrap(err, "failed to release static public IP address")
 			}
+			log.Infof("static public IP address released")
 		}
 	}
 
