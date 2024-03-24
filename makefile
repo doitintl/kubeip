@@ -38,7 +38,7 @@ all: lint test build ; $(info $(M) build, test and deploy ...) @ ## release cycl
 
 # Tools
 setup-lint:
-	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.1
 setup-mockery:
 	$(GOCMD) install github.com/vektra/mockery/v2@v2.35.2
 

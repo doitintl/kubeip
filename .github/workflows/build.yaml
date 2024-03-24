@@ -23,18 +23,27 @@ jobs:
 
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message,'[skip ci]') }}
-    container: golang:1.21-alpine
     steps:
       - name: checkout
         uses: actions/checkout@v4
+
+      - name: setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.57.1
+          skip-pkg-cache: true
+          args: --config .golangci.yaml --verbose ./...
 
       - name: test
         shell: sh
         env:
           CGO_ENABLED: 0
         run: |
-          apk --update add ca-certificates tzdata make git bash
-          make lint
           make test-json
 
       - name: upload test results
@@ -95,7 +104,7 @@ jobs:
 
       - name: prepare meta
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ github.repository }}-agent
           tags: |

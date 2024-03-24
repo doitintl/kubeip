@@ -163,7 +163,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		if cfg.ReleaseOnExit {
 			log.Infof("releasing static public IP address")
 			// use a different context for releasing the static public IP address since the main context is canceled
-			if err = assigner.Unassign(context.Background(), n.Instance, n.Zone); err != nil {
+			if err = assigner.Unassign(context.Background(), n.Instance, n.Zone); err != nil { //nolint:contextcheck
 				return errors.Wrap(err, "releasing static public IP address")
 			}
 		}
@@ -286,7 +286,7 @@ func main() {
 		Usage:   "replaces the node's public IP address with a static public IP (IPv4/IPv6) address",
 		Version: version,
 	}
-	cli.VersionPrinter = func(c *cli.Context) {
+	cli.VersionPrinter = func(_ *cli.Context) {
 		fmt.Printf("kubeip-agent %s\n", version)
 		fmt.Printf("  Build date: %s\n", buildDate)
 		fmt.Printf("  Git commit: %s\n", gitCommit)

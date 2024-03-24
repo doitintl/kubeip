@@ -19,8 +19,6 @@ linters-settings:
     check-shadowing: true
   gocyclo:
     min-complexity: 15
-  gocognit:
-    min-complexity: 35
   maligned:
     suggest-new: true
   dupl:
@@ -34,6 +32,9 @@ linters-settings:
       - "cancelled"
   goimports:
     local-prefixes: github.com/golangci/golangci-lint
+  gosec:
+    excludes:
+      - G601
   gocritic:
     enabled-tags:
       - diagnostic
@@ -52,27 +53,34 @@ linters-settings:
   funlen:
     lines: 105
     statements: 50
+  tagliatelle:
+    case:
+      use-field-name: true
+      rules:
+        json: snake
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
   # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
     # - containedctx
-    # - contextcheck disabled because of generics
-    - dupword
+    - contextcheck
     - decorder
     # - depguard
     - dogsled
+    - dupword
     - dupl
     - durationcheck
     - errcheck
     - errchkjson
     - errname
     - errorlint
+    - execinquery
     - exhaustive
     # - exhaustivestruct TODO: check how to fix it
     - exportloopref
@@ -82,20 +90,24 @@ linters:
     - gci
     # - gochecknoglobals TODO: remove globals from code
     # - gochecknoinits TODO: remove main.init
+    - gochecksumtype
     - gocognit
     - goconst
     - gocritic
     - gocyclo
-    #    - godox
+    # - godot
+    # - godox
     - goerr113
     - gofmt
     - goimports
     - gomnd
     # - gomoddirectives
+    - gomodguard
+    - goprintffuncname
     - gosec
     - gosimple
     - govet
-    - goprintffuncname
+    - gosmopolitan
     - grouper
     - importas
     # - ireturn TODO: not sure if it is a good linter
@@ -104,34 +116,44 @@ linters:
     - loggercheck
     - maintidx
     - makezero
+    - mirror
     - misspell
+    - musttag
     - nakedret
     # - nestif
     - nilerr
     - nilnil
     # - noctx
     - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - perfsprint
     - prealloc
     - predeclared
     - promlinter
+    - protogetter
     - reassign
     - revive
-    # - rowserrcheck disabled because of generics
-    # - staticcheck doesn't work with go1.19
-    # - structcheck disabled because of generics
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    # - staticcheck
     - stylecheck
+    # - tagalign
+    # - tagliatelle
     - tenv
     - testableexamples
     - typecheck
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     # - varnamelen TODO: review naming
-    # - varcheck depricated 1.49
-    # - wastedassign disabled because of generics
     - whitespace
     - wrapcheck
     # - wsl
+    - zerologlint
 
 issues:
   exclude-rules:
