@@ -99,8 +99,8 @@ func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region s
 			return nil, errors.Wrap(err, "failed to get region from metadata server")
 		}
 		// if cluster-location is zone, extract region from zone
-		if len(region) > 3 && region[len(region)-3] == '-' {
-			region = region[:len(region)-3]
+		if len(region) > 2 && region[len(region)-2] == '-' {
+			region = region[:len(region)-2]
 		}
 	}
 
