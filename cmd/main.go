@@ -88,12 +88,22 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 	defer ticker.Stop()
 
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
+		log.WithFields(logrus.Fields{
+			"node":           node.Name,
+			"instance":       node.Instance,
+			"filter":         cfg.Filter,
+			"retry-counter":  retryCounter,
+			"retry-attempts": cfg.RetryAttempts,
+		}).Debug("assigning static public IP address to node")
 		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
 		if err == nil || errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 			return nil
 		}
 
-		log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
+		log.WithError(err).WithFields(logrus.Fields{
+			"node":     node.Name,
+			"instance": node.Instance,
+		}).Error("failed to assign static public IP address to node")
 		log.Infof("retrying after %v", cfg.RetryInterval)
 
 		select {
