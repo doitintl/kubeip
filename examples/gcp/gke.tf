@@ -280,8 +280,9 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         termination_grace_period_seconds = 30
         priority_class_name              = "system-node-critical"
         container {
-          name  = "kubeip-agent"
-          image = "doitintl/kubeip-agent:${var.kubeip_version}"
+          name              = "kubeip-agent"
+          image             = "doitintl/kubeip-agent:${var.kubeip_version}"
+          image_pull_policy = "Always"
           env {
             name = "NODE_NAME"
             value_from {
