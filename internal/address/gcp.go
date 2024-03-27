@@ -28,6 +28,10 @@ const (
 	maxRetries                  = 10 // number of retries for assigning ephemeral public IP address
 )
 
+var (
+	ErrNoPublicIPAssigned = errors.New("no public IP address assigned to the instance")
+)
+
 type internalAssigner interface {
 	CheckAddressAssigned(region, addressName string) (bool, error)
 	AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error
@@ -233,7 +237,7 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	a.logger.WithField("addresses", ips).Debugf("found %d available addresses", len(addresses))
 
 	// delete current ephemeral public IP address
-	if err = a.DeleteInstanceAddress(ctx, instance, zone); err != nil {
+	if err = a.DeleteInstanceAddress(ctx, instance, zone); err != nil && !errors.Is(err, ErrNoPublicIPAssigned) {
 		return errors.Wrap(err, "failed to delete current public IP address")
 	}
 
@@ -359,12 +363,12 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 func getAccessConfig(networkInterface *compute.NetworkInterface, ipv6 bool) (*compute.AccessConfig, error) {
 	if ipv6 {
 		if len(networkInterface.Ipv6AccessConfigs) == 0 {
-			return nil, errors.New("instance network interface has no IPv6 access configs")
+			return nil, ErrNoPublicIPAssigned
 		}
 		return networkInterface.Ipv6AccessConfigs[0], nil
 	}
 	if len(networkInterface.AccessConfigs) == 0 {
-		return nil, errors.New("instance network interface has no access configs")
+		return nil, ErrNoPublicIPAssigned
 	}
 	return networkInterface.AccessConfigs[0], nil
 }

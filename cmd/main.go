@@ -88,12 +88,22 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 	defer ticker.Stop()
 
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
+		log.WithFields(logrus.Fields{
+			"node":           node.Name,
+			"instance":       node.Instance,
+			"filter":         cfg.Filter,
+			"retry-counter":  retryCounter,
+			"retry-attempts": cfg.RetryAttempts,
+		}).Debug("assigning static public IP address to node")
 		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
 		if err == nil || errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 			return nil
 		}
 
-		log.WithError(err).Errorf("failed to assign static public IP address to node %s", node.Name)
+		log.WithError(err).WithFields(logrus.Fields{
+			"node":     node.Name,
+			"instance": node.Instance,
+		}).Error("failed to assign static public IP address to node")
 		log.Infof("retrying after %v", cfg.RetryInterval)
 
 		select {
@@ -148,26 +158,33 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		}
 	}()
 
-	select {
-	case err = <-errorCh:
-		if err != nil {
-			return errors.Wrap(err, "assigning static public IP address")
-		}
-	case <-ctx.Done():
-		log.Infof("kubeip agent gracefully stopped")
-		if cfg.ReleaseOnExit {
-			log.Infof("releasing static public IP address")
-			releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout) // release the static public IP address within 5 minutes
-			defer releaseCancel()
-			// use a different context for releasing the static public IP address since the main context is canceled
-			if err = assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil { //nolint:contextcheck
-				return errors.Wrap(err, "failed to release static public IP address")
+	for {
+		select {
+		case err = <-errorCh:
+			if err != nil {
+				return errors.Wrap(err, "assigning static public IP address")
 			}
-			log.Infof("static public IP address released")
+		case <-ctx.Done():
+			log.Infof("kubeip agent gracefully stopped")
+			if cfg.ReleaseOnExit {
+				log.Infof("releasing static public IP address")
+				err = func() error {
+					releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout) // release the static public IP address within 5 minutes
+					defer releaseCancel()
+					// use a different context for releasing the static public IP address since the main context is canceled
+					if err = assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil {
+						return errors.Wrap(err, "failed to release static public IP address")
+					}
+					return nil
+				}()
+				if err != nil {
+					return err //nolint:wrapcheck
+				}
+				log.Infof("static public IP address released")
+			}
+			return nil
 		}
 	}
-
-	return nil
 }
 
 func runCmd(c *cli.Context) error {
