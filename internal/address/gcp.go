@@ -3,7 +3,6 @@ package address
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -27,7 +26,6 @@ const (
 	accessConfigKind            = "compute#accessConfig"
 	defaultPrefixLength         = 96
 	maxRetries                  = 10 // number of retries for assigning ephemeral public IP address
-	maxWaitListTime             = 10 // max time to wait before listing addresses
 )
 
 var (
@@ -222,11 +220,6 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	if err != nil {
 		return errors.Wrapf(err, "check if static public IP is already assigned to instance %s", instanceID)
 	}
-
-	// add random sleep to reduce the chance of multiple kubeip instances getting the same address list
-	waitTime := time.Duration(rand.Intn(maxWaitListTime)) * time.Second //nolint:gosec
-	a.logger.WithField("waitTime", waitTime).Debug("waiting before listing addresses")
-	time.Sleep(waitTime)
 
 	// get available reserved public IP addresses
 	addresses, err := a.listAddresses(filter, orderBy, reservedStatus)

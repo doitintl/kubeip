@@ -29,6 +29,8 @@ type Config struct {
 	RetryAttempts int `json:"retry-attempts"`
 	// ReleaseOnExit releases the IP address on exit
 	ReleaseOnExit bool `json:"release-on-exit"`
+	// LeaseDuration is the duration of the kubernetes lease
+	LeaseDuration int32 `json:"lease-duration"`
 }
 
 func NewConfig(c *cli.Context) *Config {
@@ -44,5 +46,6 @@ func NewConfig(c *cli.Context) *Config {
 	cfg.Region = c.String("region")
 	cfg.IPv6 = c.Bool("ipv6")
 	cfg.ReleaseOnExit = c.Bool("release-on-exit")
+	cfg.LeaseDuration = int32(c.Int("lease-duration"))
 	return &cfg
 }
