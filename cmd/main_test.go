@@ -11,6 +11,7 @@ import (
 	mocks "github.com/doitintl/kubeip/mocks/address"
 	"github.com/pkg/errors"
 	tmock "github.com/stretchr/testify/mock"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func Test_assignAddress(t *testing.T) {
@@ -45,6 +46,7 @@ func Test_assignAddress(t *testing.T) {
 					OrderBy:       "test-order-by",
 					RetryAttempts: 3,
 					RetryInterval: time.Millisecond,
+					LeaseDuration: 1,
 				},
 			},
 		},
@@ -70,6 +72,7 @@ func Test_assignAddress(t *testing.T) {
 					OrderBy:       "test-order-by",
 					RetryAttempts: 3,
 					RetryInterval: time.Millisecond,
+					LeaseDuration: 1,
 				},
 			},
 		},
@@ -93,6 +96,7 @@ func Test_assignAddress(t *testing.T) {
 					OrderBy:       "test-order-by",
 					RetryAttempts: 3,
 					RetryInterval: time.Millisecond,
+					LeaseDuration: 1,
 				},
 			},
 			wantErr: true,
@@ -125,6 +129,7 @@ func Test_assignAddress(t *testing.T) {
 					OrderBy:       "test-order-by",
 					RetryAttempts: 10,
 					RetryInterval: 5 * time.Millisecond,
+					LeaseDuration: 1,
 				},
 			},
 			wantErr: true,
@@ -152,6 +157,7 @@ func Test_assignAddress(t *testing.T) {
 					OrderBy:       "test-order-by",
 					RetryAttempts: 3,
 					RetryInterval: 15 * time.Millisecond,
+					LeaseDuration: 1,
 				},
 			},
 			wantErr: true,
@@ -161,7 +167,8 @@ func Test_assignAddress(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log := prepareLogger("debug", false)
 			assigner := tt.args.assignerFn(t)
-			if err := assignAddress(tt.args.c, log, assigner, tt.args.node, tt.args.cfg); (err != nil) != tt.wantErr {
+			client := fake.NewSimpleClientset()
+			if err := assignAddress(tt.args.c, log, client, assigner, tt.args.node, tt.args.cfg); (err != nil) != tt.wantErr {
 				t.Errorf("assignAddress() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
