@@ -91,7 +91,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	defer ticker.Stop()
 
 	// create new cluster wide lock
-	lock := lease.NewKubeLeaseLock(client, kubeipLockName, "default", node.Name, cfg.LeaseDuration)
+	lock := lease.NewKubeLeaseLock(client, kubeipLockName, "default", node.Instance, cfg.LeaseDuration)
 
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
 		log.WithFields(logrus.Fields{
@@ -105,7 +105,11 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			if err := lock.Lock(ctx); err != nil {
 				return errors.Wrap(err, "failed to acquire lock")
 			}
-			defer lock.Unlock(ctx) //nolint:errcheck
+			log.Debug("lock acquired")
+			defer func() {
+				lock.Unlock(ctx) //nolint:errcheck
+				log.Debug("lock released")
+			}()
 			if err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy); err != nil {
 				return err //nolint:wrapcheck
 			}

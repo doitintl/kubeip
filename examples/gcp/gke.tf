@@ -308,6 +308,10 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
             name  = "LOG_JSON"
             value = "true"
           }
+          env {
+            name  = "LEASE_DURATION"
+            value = "20"
+          }
           resources {
             requests = {
               cpu = "100m"
