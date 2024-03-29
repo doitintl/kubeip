@@ -91,7 +91,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	defer ticker.Stop()
 
 	// create new cluster wide lock
-	lock := lease.NewKubeLeaseLock(client, kubeipLockName, "default", node.Instance, cfg.LeaseDuration)
+	lock := lease.NewKubeLeaseLock(client, kubeipLockName, cfg.LeaseNamespace, node.Instance, cfg.LeaseDuration)
 
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
 		log.WithFields(logrus.Fields{
@@ -291,6 +291,13 @@ func main() {
 						Usage:    "duration of the kubernetes lease",
 						Value:    defaultLeaseDuration,
 						EnvVars:  []string{"LEASE_DURATION"},
+						Category: "Configuration",
+					},
+					&cli.StringFlag{
+						Name:     "lease-namespace",
+						Usage:    "namespace of the kubernetes lease",
+						EnvVars:  []string{"LEASE_NAMESPACE"},
+						Value:    "default", // default namespace
 						Category: "Configuration",
 					},
 					&cli.BoolFlag{
