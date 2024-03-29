@@ -66,6 +66,9 @@ rules:
   - apiGroups: [ "" ]
     resources: [ "nodes" ]
     verbs: [ "get" ]
+  - apiGroups: [ "coordination.k8s.io" ]
+    resources: [ "leases" ]
+    verbs: [ "create", "get", "delete" ]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -230,6 +233,8 @@ OPTIONS:
    --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
    --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]
    --retry-interval value             when the agent fails to assign the static public IP address, it will retry after this interval (default: 5m0s) [$RETRY_INTERVAL]
+   --lease-duration value             duration of the kubernetes lease (default: 5) [$LEASE_DURATION]
+   --lease-namespace value            namespace of the kubernetes lease (default: "default") [$LEASE_NAMESPACE]
 
    Development
 
