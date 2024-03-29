@@ -9,6 +9,7 @@ import (
 
 	"github.com/doitintl/kubeip/internal/address"
 	"github.com/doitintl/kubeip/internal/config"
+	"github.com/doitintl/kubeip/internal/lease"
 	nd "github.com/doitintl/kubeip/internal/node"
 	"github.com/doitintl/kubeip/internal/types"
 	"github.com/pkg/errors"
@@ -23,8 +24,10 @@ import (
 type contextKey string
 
 const (
-	developModeKey  contextKey = "develop-mode"
-	unassignTimeout            = 5 * time.Minute
+	developModeKey       contextKey = "develop-mode"
+	unassignTimeout                 = 5 * time.Minute
+	kubeipLockName                  = "kubeip-lock"
+	defaultLeaseDuration            = 5
 )
 
 var (
@@ -79,13 +82,16 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assigner, node *types.Node, cfg *config.Config) error {
+func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Interface, assigner address.Assigner, node *types.Node, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
 	// ticker for retry interval
 	ticker := time.NewTicker(cfg.RetryInterval)
 	defer ticker.Stop()
+
+	// create new cluster wide lock
+	lock := lease.NewKubeLeaseLock(client, kubeipLockName, "default", node.Instance, cfg.LeaseDuration)
 
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
 		log.WithFields(logrus.Fields{
@@ -95,7 +101,20 @@ func assignAddress(c context.Context, log *logrus.Entry, assigner address.Assign
 			"retry-counter":  retryCounter,
 			"retry-attempts": cfg.RetryAttempts,
 		}).Debug("assigning static public IP address to node")
-		err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
+		err := func(ctx context.Context) error {
+			if err := lock.Lock(ctx); err != nil {
+				return errors.Wrap(err, "failed to acquire lock")
+			}
+			log.Debug("lock acquired")
+			defer func() {
+				lock.Unlock(ctx) //nolint:errcheck
+				log.Debug("lock released")
+			}()
+			if err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy); err != nil {
+				return err //nolint:wrapcheck
+			}
+			return nil
+		}(c)
 		if err == nil || errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 			return nil
 		}
@@ -152,7 +171,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	errorCh := make(chan error, 1) // buffered channel to avoid goroutine leak
 	go func() {
 		defer close(errorCh) // close the channel when the goroutine exits to avoid goroutine leak
-		e := assignAddress(ctx, log, assigner, n, cfg)
+		e := assignAddress(ctx, log, clientset, assigner, n, cfg)
 		if e != nil {
 			errorCh <- e
 		}
@@ -265,6 +284,13 @@ func main() {
 						Usage:    "number of attempts to assign the static public IP address",
 						Value:    defaultRetryAttempts,
 						EnvVars:  []string{"RETRY_ATTEMPTS"},
+						Category: "Configuration",
+					},
+					&cli.IntFlag{
+						Name:     "lease-duration",
+						Usage:    "duration of the kubernetes lease",
+						Value:    defaultLeaseDuration,
+						EnvVars:  []string{"LEASE_DURATION"},
 						Category: "Configuration",
 					},
 					&cli.BoolFlag{

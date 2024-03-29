@@ -227,6 +227,11 @@ resource "kubernetes_cluster_role" "kubeip_cluster_role" {
     resources  = ["nodes"]
     verbs      = ["get"]
   }
+  rule {
+    api_groups = ["coordination.k8s.io"]
+    resources  = ["leases"]
+    verbs      = ["create", "delete", "get", "list", "update"]
+  }
   depends_on = [
     kubernetes_service_account.kubeip_service_account,
     google_container_cluster.kubeip_cluster
@@ -302,6 +307,10 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           env {
             name  = "LOG_JSON"
             value = "true"
+          }
+          env {
+            name  = "LEASE_DURATION"
+            value = "20"
           }
           resources {
             requests = {
