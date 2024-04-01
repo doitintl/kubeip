@@ -230,7 +230,7 @@ resource "kubernetes_cluster_role" "kubeip_cluster_role" {
   rule {
     api_groups = ["coordination.k8s.io"]
     resources  = ["leases"]
-    verbs      = ["create", "delete", "get", "list", "update"]
+    verbs      = ["create", "delete", "get"]
   }
   depends_on = [
     kubernetes_service_account.kubeip_service_account,
@@ -274,6 +274,12 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         app = "kubeip"
       }
     }
+    strategy {
+      type = "RollingUpdate"
+      rolling_update {
+        max_unavailable = 1
+      }
+    }
     template {
       metadata {
         labels = {
@@ -284,6 +290,14 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
         service_account_name             = "kubeip-service-account"
         termination_grace_period_seconds = 30
         priority_class_name              = "system-node-critical"
+        toleration {
+          effect   = "NoSchedule"
+          operator = "Exists"
+        }
+        toleration {
+          effect   = "NoExecute"
+          operator = "Exists"
+        }
         container {
           name              = "kubeip-agent"
           image             = "doitintl/kubeip-agent:${var.kubeip_version}"
@@ -311,6 +325,14 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           env {
             name  = "LEASE_DURATION"
             value = "20"
+          }
+          env {
+            name = "LEASE_NAMESPACE"
+            value_from {
+              field_ref {
+                field_path = "metadata.namespace"
+              }
+            }
           }
           resources {
             requests = {
