@@ -28,7 +28,6 @@ const (
 	unassignTimeout                 = 5 * time.Minute
 	kubeipLockName                  = "kubeip-lock"
 	defaultLeaseDuration            = 5
-	loopInterval                    = 100 * time.Millisecond
 )
 
 var (
@@ -178,15 +177,11 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		}
 	}()
 
-	// Create a ticker for non-blocking delay
-	loopTicker := time.NewTicker(loopInterval)
-	defer loopTicker.Stop()
-
 	for {
 		select {
-		case err = <-errorCh:
-			if err != nil {
-				return errors.Wrap(err, "assigning static public IP address")
+		case assignErr, ok := <-errorCh:
+			if ok && assignErr != nil {
+				return errors.Wrap(assignErr, "assigning static public IP address")
 			}
 		case <-ctx.Done():
 			log.Infof("kubeip agent gracefully stopped")
@@ -207,9 +202,6 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 				log.Infof("static public IP address released")
 			}
 			return nil
-		case <-loopTicker.C:
-			// Wait for the next tick before continuing the loop
-			// This case prevents high CPU usage by introducing a non-blocking delay
 		}
 	}
 }
