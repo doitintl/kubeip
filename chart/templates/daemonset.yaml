@@ -8,6 +8,10 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "kubeip.name" . }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
   template:
     metadata:
       labels:
@@ -20,6 +24,11 @@ spec:
 {{- if .Values.daemonSet.nodeSelector }}
 {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
 {{- end }}
+      tolerations:
+        - operator: "Exists"
+          effect: "NoSchedule"
+        - operator: "Exists"
+          effect: "NoExecute"
       containers:
         - name: kubeip
           image: "{{ .Values.image.repository }}"
