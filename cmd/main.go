@@ -137,6 +137,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	return errors.New("reached maximum number of retries")
 }
 
+//nolint:gocyclo
 func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
