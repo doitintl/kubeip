@@ -260,12 +260,8 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
           }
           resources {
             requests = {
-              cpu    = "100m"
-              memory = "64Mi"
-            }
-            limits = {
-              cpu    = "100m"
-              memory = "128Mi"
+              cpu    = "10m"
+              memory = "32Mi"
             }
           }
         }
