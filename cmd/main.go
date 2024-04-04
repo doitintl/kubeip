@@ -139,6 +139,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
+
 	// add debug mode to context
 	if cfg.DevelopMode {
 		ctx = context.WithValue(ctx, developModeKey, true)
@@ -167,43 +168,37 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	if err != nil {
 		return errors.Wrap(err, "initializing assigner")
 	}
-	// assign static public IP address
-	errorCh := make(chan error, 1) // buffered channel to avoid goroutine leak
-	go func() {
-		defer close(errorCh) // close the channel when the goroutine exits to avoid goroutine leak
-		e := assignAddress(ctx, log, clientset, assigner, n, cfg)
-		if e != nil {
-			errorCh <- e
-		}
-	}()
 
-	for {
-		select {
-		case err = <-errorCh:
-			if err != nil {
-				return errors.Wrap(err, "assigning static public IP address")
-			}
-		case <-ctx.Done():
-			log.Infof("kubeip agent gracefully stopped")
-			if cfg.ReleaseOnExit {
-				log.Infof("releasing static public IP address")
-				err = func() error {
-					releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout) // release the static public IP address within 5 minutes
-					defer releaseCancel()
-					// use a different context for releasing the static public IP address since the main context is canceled
-					if err = assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil {
-						return errors.Wrap(err, "failed to release static public IP address")
-					}
-					return nil
-				}()
-				if err != nil {
-					return err //nolint:wrapcheck
-				}
-				log.Infof("static public IP address released")
-			}
-			return nil
-		}
+	err = assignAddress(ctx, log, clientset, assigner, n, cfg)
+	if err != nil {
+		return errors.Wrap(err, "assigning static public IP address")
 	}
+
+	// pause the agent to prevent it from exiting immediately after assigning the static public IP address
+	// wait for the context to be done: SIGTERM, SIGINT
+	<-ctx.Done()
+	log.Infof("shutting down kubeip agent")
+
+	// release the static public IP address on exit
+	if cfg.ReleaseOnExit {
+		log.Infof("releasing static public IP address")
+		if releaseErr := releaseIP(assigner, n); releaseErr != nil { //nolint:contextcheck
+			return releaseErr
+		}
+		log.Infof("static public IP address released")
+	}
+	return nil
+}
+
+func releaseIP(assigner address.Assigner, n *types.Node) error {
+	releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout)
+	defer releaseCancel()
+
+	if err := assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil {
+		return errors.Wrap(err, "failed to release static public IP address")
+	}
+
+	return nil
 }
 
 func runCmd(c *cli.Context) error {
@@ -213,7 +208,8 @@ func runCmd(c *cli.Context) error {
 	cfg := config.NewConfig(c)
 
 	if err := run(ctx, log, cfg); err != nil {
-		log.Fatalf("eks-lens agent failed: %v", err)
+		log.WithError(err).Error("error running kubeip agent")
+		return err
 	}
 
 	return nil

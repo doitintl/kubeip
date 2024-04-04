@@ -17,10 +17,10 @@ serviceAccount:
   name: kubeip-service-account
   annotations:
     gcpServiceAccountEmail: kubeip-service-account@workload-id-117715.iam.gserviceaccount.com
-# annotations:
-#   awsRoleArn: "your-aws-role-arn"
-#   gcpServiceAccountEmail: "your-google-service-account-email"
-    
+    # annotations:
+    #   awsRoleArn: "your-aws-role-arn"
+    #   gcpServiceAccountEmail: "your-google-service-account-email"
+
 
 # Role-Based Access Control (RBAC) configuration.
 rbac:
@@ -40,3 +40,7 @@ daemonSet:
   resources:
     requests:
       cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi

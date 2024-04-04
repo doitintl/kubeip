@@ -11,5 +11,5 @@ rules:
     verbs: [ "get" ]
   - apiGroups: [ "coordination.k8s.io" ]
     resources: [ "leases" ]
-    verbs: [ "create", "get", "delete" ]
+    verbs: [ "create", "delete", "get" ]
 {{- end }}
