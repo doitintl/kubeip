@@ -174,6 +174,14 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		return errors.Wrap(err, "assigning static public IP address")
 	}
 
+	if cfg.TaintKey != "" {
+		tainter := nd.NewTainter(clientset, log)
+		err = tainter.RemoveTaintKey(ctx, n, cfg.TaintKey)
+		if err != nil {
+			return errors.Wrap(err, "removing taint key")
+		}
+	}
+
 	// pause the agent to prevent it from exiting immediately after assigning the static public IP address
 	// wait for the context to be done: SIGTERM, SIGINT
 	<-ctx.Done()
@@ -302,6 +310,12 @@ func main() {
 						EnvVars:  []string{"RELEASE_ON_EXIT"},
 						Category: "Configuration",
 						Value:    true,
+					},
+					&cli.StringFlag{
+						Name:     "taint-key",
+						Usage:    "specify a taint key to remove from the node once the static public IP address is assigned",
+						EnvVars:  []string{"TAINT_KEY"},
+						Category: "Configuration",
 					},
 					&cli.StringFlag{
 						Name:     "log-level",
