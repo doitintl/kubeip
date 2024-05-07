@@ -142,8 +142,9 @@ spec:
     spec:
       serviceAccountName: kubeip-service-account
 +     tolerations:
-+       - effect: NoSchedule
-+         key: kubeip.com/not-ready
++       - key: kubeip.com/not-ready
++         operator: Exists
++         effect: NoSchedule
       containers:
         - name: kubeip
           image: doitintl/kubeip-agent
