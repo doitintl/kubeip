@@ -8,7 +8,11 @@ metadata:
 rules:
   - apiGroups: [ "" ]
     resources: [ "nodes" ]
+    {{- if .Values.rbac.allowNodesPatchPermission }}
+    verbs: [ "get", "patch" ]
+    {{- else }}
     verbs: [ "get" ]
+    {{- end }}
   - apiGroups: [ "coordination.k8s.io" ]
     resources: [ "leases" ]
     verbs: [ "create", "delete", "get" ]
