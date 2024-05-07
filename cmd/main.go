@@ -180,15 +180,17 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 
 		didRemoveTaint, err := tainter.RemoveTaintKey(ctx, n, cfg.TaintKey)
 		if err != nil {
-			logger.Error("removing node taint failed, releasing static public IP address")
+			logger.Error("removing taint key failed, releasing static public IP address")
 			if releaseErr := releaseIP(assigner, n); releaseErr != nil {
-				log.WithError(releaseErr).Error("releasing static public IP address after taint removal failed")
+				log.WithError(releaseErr).Error("releasing static public IP address after taint key removal failed")
 			}
 			return errors.Wrap(err, "removing node taint key")
 		}
 
 		if didRemoveTaint {
-			logger.Infof("node taint removed successfully")
+			logger.Info("taint key removed successfully")
+		} else {
+			logger.Warning("taint key not present on node, skipped removal")
 		}
 	}
 
