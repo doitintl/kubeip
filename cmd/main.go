@@ -181,7 +181,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		didRemoveTaint, err := tainter.RemoveTaintKey(ctx, n, cfg.TaintKey)
 		if err != nil {
 			logger.Error("removing taint key failed, releasing static public IP address")
-			if releaseErr := releaseIP(assigner, n); releaseErr != nil {
+			if releaseErr := releaseIP(assigner, n); releaseErr != nil { //nolint:contextcheck
 				log.WithError(releaseErr).Error("releasing static public IP address after taint key removal failed")
 			}
 			return errors.Wrap(err, "removing node taint key")
