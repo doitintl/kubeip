@@ -48,7 +48,7 @@ To enable IPv6 support, set the `ipv6` flag (or set `IPV6` environment variable)
 
 ### Kubernetes Service Account
 
-KubeIP requires a Kubernetes service account with the following permissions:
+KubeIP requires a Kubernetes service account with at least the following permissions:
 
 ```yaml
 apiVersion: v1
@@ -127,6 +127,44 @@ spec:
               value: debug
             - name: LOG_JSON
               value: "true"
+```
+
+### Node Taints
+
+KubeIP can be configured to attempt removal of a Taint Key from its node once the static IP has been successfully assigned, preventing workloads from being scheduled on the node until it has successfully received a static IP address. This can be useful, for example, in cases where the workload must call resources with IP-whitelisting, to prevent race conditions between KubeIP and the workload on newly provisioned nodes.
+
+To enable this feature, set the `taint-key` configuration parameter (See [How to run KubeIP](#how-to-run-kubeip)) to the taint key that should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes. For example, given that new nodes are created with a taint key of `kubeip.com/not-ready`:
+
+```diff
+kind: DaemonSet
+spec:
+  template:
+    spec:
+      serviceAccountName: kubeip-service-account
++     tolerations:
++       - key: kubeip.com/not-ready
++         operator: Exists
++         effect: NoSchedule
+      containers:
+        - name: kubeip
+          image: doitintl/kubeip-agent
+          env:
++           - name: TAINT_KEY
++             value: kubeip.com/not-ready
+```
+
+The parameter has no default value, and if not set, KubeIP will not attempt to remove any taints. If the provided Taint Key is not present on the node, KubeIP will simply log this fact and continue normally without attempting to remove it. If the Taint Key is present, but removing it fails for some reason, KubeIP will release the IP address back into the pool before restarting and trying again.
+
+Using this feature requires KubeIP to have permission to patch nodes. To use this feature, the `ClusterRole` resource rules need to be updated. **Note that if this configuration option is not set, KubeIP will not attempt to patch any nodes, and the change to the rules is not necessary.**
+
+Please keep in mind that this will give KubeIP permission to make updates to any node in your cluster, so please make sure that this aligns with your security requirements before enabling this feature!
+
+```diff
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "nodes" ]
+-   verbs: [ "get" ]
++   verbs: [ "get", "patch" ]
 ```
 
 ### AWS
@@ -231,6 +269,7 @@ OPTIONS:
    --project value                    name of the GCP project or the AWS account ID (not needed if running in node) [$PROJECT]
    --region value                     name of the GCP region or the AWS region (not needed if running in node) [$REGION]
    --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
+   --taint-key value                  specify a taint key to remove from the node once the static public IP address is assigned [$TAINT_KEY]
    --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]
    --retry-interval value             when the agent fails to assign the static public IP address, it will retry after this interval (default: 5m0s) [$RETRY_INTERVAL]
    --lease-duration value             duration of the kubernetes lease (default: 5) [$LEASE_DURATION]

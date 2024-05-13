@@ -25,6 +25,7 @@ serviceAccount:
 # Role-Based Access Control (RBAC) configuration.
 rbac:
   create: true
+  allowNodesPatchPermission: false
 
 # DaemonSet configuration.
 daemonSet:
@@ -35,6 +36,7 @@ daemonSet:
     kubeip: use
   env:
     FILTER: labels.kubeip=reserved;labels.environment=demo
+    TAINT_KEY: ""
     LOG_LEVEL: debug
     LOG_JSON: true
   resources:

@@ -42,6 +42,8 @@ spec:
                   fieldPath: spec.nodeName
             - name: FILTER
               value: {{ .Values.daemonSet.env.FILTER | quote }}
+            - name: TAINT_KEY
+              value: {{ .Values.daemonSet.env.TAINT_KEY | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.daemonSet.env.LOG_LEVEL | quote }}
             - name: LOG_JSON
