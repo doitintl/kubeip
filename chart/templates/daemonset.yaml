@@ -29,6 +29,11 @@ spec:
           effect: "NoSchedule"
         - operator: "Exists"
           effect: "NoExecute"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: kubeip
           image: "{{ .Values.image.repository }}"
@@ -46,3 +51,10 @@ spec:
               value: {{ .Values.daemonSet.env.LOG_LEVEL | quote }}
             - name: LOG_JSON
               value: {{ .Values.daemonSet.env.LOG_JSON | quote }}
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
