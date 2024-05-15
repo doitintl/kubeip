@@ -34,5 +34,7 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 # copy the binary to the production image from the builder stage
 COPY --from=builder /app/.bin/kubeip-agent /kubeip-agent
 
+USER 1001
+
 ENTRYPOINT ["/kubeip-agent"]
 CMD ["run"]
