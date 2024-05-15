@@ -131,40 +131,61 @@ spec:
 
 ### Node Taints
 
-KubeIP can be configured to attempt removal of a Taint Key from its node once the static IP has been successfully assigned, preventing workloads from being scheduled on the node until it has successfully received a static IP address. This can be useful, for example, in cases where the workload must call resources with IP-whitelisting, to prevent race conditions between KubeIP and the workload on newly provisioned nodes.
+KubeIP can be configured to attempt removal of a Taint Key from its node once the static IP has been successfully assigned, preventing
+workloads from being scheduled on the node until it has successfully received a static IP address. This can be useful, for example, in cases
+where the workload must call resources with IP-whitelisting, to prevent race conditions between KubeIP and the workload on newly provisioned
+nodes.
 
-To enable this feature, set the `taint-key` configuration parameter (See [How to run KubeIP](#how-to-run-kubeip)) to the taint key that should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes. For example, given that new nodes are created with a taint key of `kubeip.com/not-ready`:
+To enable this feature, set the `taint-key` configuration parameter (See [How to run KubeIP](#how-to-run-kubeip)) to the taint key that
+should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes. For example,
+given that new nodes are created with a taint key of `kubeip.com/not-ready`:
 
-```diff
+```yaml
 kind: DaemonSet
 spec:
   template:
     spec:
       serviceAccountName: kubeip-service-account
-+     tolerations:
-+       - key: kubeip.com/not-ready
-+         operator: Exists
-+         effect: NoSchedule
+      tolerations:
+        - key: kubeip.com/not-ready
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: kubeip
           image: doitintl/kubeip-agent
           env:
-+           - name: TAINT_KEY
-+             value: kubeip.com/not-ready
+            - name: TAINT_KEY
+              value: kubeip.com/not-ready
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
 ```
 
-The parameter has no default value, and if not set, KubeIP will not attempt to remove any taints. If the provided Taint Key is not present on the node, KubeIP will simply log this fact and continue normally without attempting to remove it. If the Taint Key is present, but removing it fails for some reason, KubeIP will release the IP address back into the pool before restarting and trying again.
+The parameter has no default value, and if not set, KubeIP will not attempt to remove any taints. If the provided Taint Key is not present
+on the node, KubeIP will simply log this fact and continue normally without attempting to remove it. If the Taint Key is present, but
+removing it fails for some reason, KubeIP will release the IP address back into the pool before restarting and trying again.
 
-Using this feature requires KubeIP to have permission to patch nodes. To use this feature, the `ClusterRole` resource rules need to be updated. **Note that if this configuration option is not set, KubeIP will not attempt to patch any nodes, and the change to the rules is not necessary.**
+Using this feature requires KubeIP to have permission to patch nodes. To use this feature, the `ClusterRole` resource rules need to be
+updated. **Note that if this configuration option is not set, KubeIP will not attempt to patch any nodes, and the change to the rules is not
+necessary.**
 
-Please keep in mind that this will give KubeIP permission to make updates to any node in your cluster, so please make sure that this aligns with your security requirements before enabling this feature!
+Please keep in mind that this will give KubeIP permission to make updates to any node in your cluster, so please make sure that this aligns
+with your security requirements before enabling this feature!
 
-```diff
+```yaml
 rules:
   - apiGroups: [ "" ]
     resources: [ "nodes" ]
--   verbs: [ "get" ]
-+   verbs: [ "get", "patch" ]
+    verbs: [ "get", "patch" ]
 ```
 
 ### AWS
