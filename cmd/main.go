@@ -110,7 +110,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 				lock.Unlock(ctx) //nolint:errcheck
 				log.Debug("lock released")
 			}()
-			if err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy); err != nil {
+			if _, err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy); err != nil {
 				return err //nolint:wrapcheck
 			}
 			return nil
