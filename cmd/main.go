@@ -82,7 +82,7 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 	return log
 }
 
-func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Interface, assigner address.Assigner, node *types.Node, cfg *config.Config) error {
+func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Interface, assigner address.Assigner, node *types.Node, cfg *config.Config) (string, error) {
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
@@ -101,22 +101,23 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			"retry-counter":  retryCounter,
 			"retry-attempts": cfg.RetryAttempts,
 		}).Debug("assigning static public IP address to node")
-		err := func(ctx context.Context) error {
+		assignedAddress, err := func(ctx context.Context) (string, error) {
 			if err := lock.Lock(ctx); err != nil {
-				return errors.Wrap(err, "failed to acquire lock")
+				return "", errors.Wrap(err, "failed to acquire lock")
 			}
 			log.Debug("lock acquired")
 			defer func() {
 				lock.Unlock(ctx) //nolint:errcheck
 				log.Debug("lock released")
 			}()
-			if _, err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy); err != nil {
-				return err //nolint:wrapcheck
+			assignedAddress, err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
+			if err != nil {
+				return "", err //nolint:wrapcheck
 			}
-			return nil
+			return assignedAddress, nil
 		}(c)
 		if err == nil || errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
-			return nil
+			return assignedAddress, nil
 		}
 
 		log.WithError(err).WithFields(logrus.Fields{
@@ -130,10 +131,10 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			continue
 		case <-ctx.Done():
 			// If the context is done, return an error indicating that the operation was cancelled
-			return errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
+			return "", errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
 		}
 	}
-	return errors.New("reached maximum number of retries")
+	return "", errors.New("reached maximum number of retries")
 }
 
 func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
@@ -169,7 +170,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		return errors.Wrap(err, "initializing assigner")
 	}
 
-	err = assignAddress(ctx, log, clientset, assigner, n, cfg)
+	_, err = assignAddress(ctx, log, clientset, assigner, n, cfg)
 	if err != nil {
 		return errors.Wrap(err, "assigning static public IP address")
 	}

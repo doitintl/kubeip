@@ -24,15 +24,17 @@ func Test_assignAddress(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
+		address string
 		wantErr bool
 	}{
 		{
-			name: "assign address successfully",
+			name:    "assign address successfully",
+			address: "1.1.1.1",
 			args: args{
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil)
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("1.1.1.1", nil)
 					return mock
 				},
 				node: &types.Node{
@@ -51,14 +53,15 @@ func Test_assignAddress(t *testing.T) {
 			},
 		},
 		{
-			name: "assign address after a few retries",
+			name:    "assign address after a few retries",
+			address: "1.1.1.1",
 			args: args{
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("first error")).Once()
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("second error")).Once()
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(nil).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("", errors.New("first error")).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("", errors.New("second error")).Once()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("1.1.1.1", nil).Once()
 					return mock
 				},
 				node: &types.Node{
@@ -82,7 +85,7 @@ func Test_assignAddress(t *testing.T) {
 				c: context.Background(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Times(4)
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("", errors.New("error")).Times(4)
 					return mock
 				},
 				node: &types.Node{
@@ -115,7 +118,7 @@ func Test_assignAddress(t *testing.T) {
 				}(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Maybe()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("", errors.New("error")).Maybe()
 					return mock
 				},
 				node: &types.Node{
@@ -143,7 +146,7 @@ func Test_assignAddress(t *testing.T) {
 				}(),
 				assignerFn: func(t *testing.T) address.Assigner {
 					mock := mocks.NewAssigner(t)
-					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return(errors.New("error")).Maybe()
+					mock.EXPECT().Assign(tmock.Anything, "test-instance", "test-zone", []string{"test-filter"}, "test-order-by").Return("", errors.New("error")).Maybe()
 					return mock
 				},
 				node: &types.Node{
@@ -168,8 +171,11 @@ func Test_assignAddress(t *testing.T) {
 			log := prepareLogger("debug", false)
 			assigner := tt.args.assignerFn(t)
 			client := fake.NewSimpleClientset()
-			if err := assignAddress(tt.args.c, log, client, assigner, tt.args.node, tt.args.cfg); (err != nil) != tt.wantErr {
+			assignedAddress, err := assignAddress(tt.args.c, log, client, assigner, tt.args.node, tt.args.cfg)
+			if err != nil != tt.wantErr {
 				t.Errorf("assignAddress() error = %v, wantErr %v", err, tt.wantErr)
+			} else if assignedAddress != tt.address {
+				t.Fatalf("assignAddress() = %v, want %v", assignedAddress, tt.address)
 			}
 		})
 	}
