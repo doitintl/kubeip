@@ -329,6 +329,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 		instanceGetterFn func(t *testing.T) cloud.InstanceGetter
 		project          string
 		region           string
+		address          string
 	}
 	type args struct {
 		ctx        context.Context
@@ -348,6 +349,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 			fields: fields{
 				project: "test-project",
 				region:  "test-region",
+				address: "100.0.0.3",
 				listerFn: func(t *testing.T) cloud.Lister {
 					mock := mocks.NewLister(t)
 					mockCall := mocks.NewListCall(t)
@@ -407,6 +409,55 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 				orderBy:    "test-order-by",
 			},
 		},
+		{
+			name: "assign when static IP address already allocted",
+			fields: fields{
+				project: "test-project",
+				region:  "test-region",
+				address: "100.0.0.2",
+				listerFn: func(t *testing.T) cloud.Lister {
+					mock := mocks.NewLister(t)
+					mockCall := mocks.NewListCall(t)
+					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
+					mockCall.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL) (ipVersion!=IPV6)").Return(mockCall).Once()
+					mockCall.EXPECT().Do().Return(&compute.AddressList{
+						Items: []*compute.Address{
+							{Name: "test-address-1", Status: inUseStatus, Address: "100.0.0.1", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-1"}},
+							{Name: "test-address-2", Status: inUseStatus, Address: "100.0.0.2", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL", Users: []string{"self-link-test-instance-2"}},
+						},
+					}, nil).Once()
+					return mock
+				},
+				instanceGetterFn: func(t *testing.T) cloud.InstanceGetter {
+					mock := mocks.NewInstanceGetter(t)
+					mock.EXPECT().Get("test-project", "test-zone", "test-instance-0").Return(&compute.Instance{
+						Name:     "test-instance-0",
+						Zone:     "test-zone",
+						SelfLink: "self-link-test-instance-2",
+						NetworkInterfaces: []*compute.NetworkInterface{
+							{
+								Name: "test-network-interface",
+								AccessConfigs: []*compute.AccessConfig{
+									{Name: "test-access-config", NatIP: "200.0.0.1", Type: defaultAccessConfigType, Kind: accessConfigKind},
+								},
+								Fingerprint: "test-fingerprint",
+							},
+						},
+					}, nil)
+					return mock
+				},
+				addressManagerFn: func(t *testing.T) cloud.AddressManager {
+					return mocks.NewAddressManager(t)
+				},
+			},
+			args: args{
+				ctx:        context.TODO(),
+				instanceID: "test-instance-0",
+				zone:       "test-zone",
+				filter:     []string{"test-filter-1", "test-filter-2"},
+				orderBy:    "test-order-by",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -419,8 +470,11 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 				region:         tt.fields.region,
 				logger:         logger,
 			}
-			if err := a.Assign(tt.args.ctx, tt.args.instanceID, tt.args.zone, tt.args.filter, tt.args.orderBy); (err != nil) != tt.wantErr {
+			address, err := a.Assign(tt.args.ctx, tt.args.instanceID, tt.args.zone, tt.args.filter, tt.args.orderBy)
+			if err != nil != tt.wantErr {
 				t.Errorf("Assign() error = %v, wantErr %v", err, tt.wantErr)
+			} else if address != tt.fields.address {
+				t.Fatalf("Assign() = %v, want %v", address, tt.fields.address)
 			}
 		})
 	}

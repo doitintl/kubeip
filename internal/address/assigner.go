@@ -16,7 +16,7 @@ var (
 )
 
 type Assigner interface {
-	Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) error
+	Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) (string, error)
 	Unassign(ctx context.Context, instanceID, zone string) error
 }
 

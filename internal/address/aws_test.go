@@ -431,6 +431,7 @@ func Test_awsAssigner_Assign(t *testing.T) {
 	type fields struct {
 		region           string
 		logger           *logrus.Entry
+		address          string
 		instanceGetterFn func(t *testing.T, args *args) cloud.Ec2InstanceGetter
 		eipListerFn      func(t *testing.T, args *args) cloud.EipLister
 		eipAssignerFn    func(t *testing.T, args *args) cloud.EipAssigner
@@ -444,8 +445,9 @@ func Test_awsAssigner_Assign(t *testing.T) {
 		{
 			name: "assign EIP to instance",
 			fields: fields{
-				region: "us-east-1",
-				logger: logrus.NewEntry(logrus.New()),
+				region:  "us-east-1",
+				logger:  logrus.NewEntry(logrus.New()),
+				address: "100.0.0.1",
 				instanceGetterFn: func(t *testing.T, args *args) cloud.Ec2InstanceGetter {
 					mock := mocks.NewEc2InstanceGetter(t)
 					mock.EXPECT().Get(args.ctx, args.instanceID, "us-east-1").Return(&types.Instance{
@@ -584,8 +586,11 @@ func Test_awsAssigner_Assign(t *testing.T) {
 				eipLister:      tt.fields.eipListerFn(t, &tt.args),
 				eipAssigner:    tt.fields.eipAssignerFn(t, &tt.args),
 			}
-			if err := a.Assign(tt.args.ctx, tt.args.instanceID, "", tt.args.filter, tt.args.orderBy); (err != nil) != tt.wantErr {
+			address, err := a.Assign(tt.args.ctx, tt.args.instanceID, "", tt.args.filter, tt.args.orderBy)
+			if err != nil != tt.wantErr {
 				t.Errorf("Assign() error = %v, wantErr %v", err, tt.wantErr)
+			} else if address != tt.fields.address {
+				t.Fatalf("Assign() = %v, want %v", address, tt.fields.address)
 			}
 		})
 	}
