@@ -1,6 +1,6 @@
 # The cloud provider where your Kubernetes cluster is running.
 # This value determines the appropriate annotations for the Service Account.
-# Currently acceptable values are 'gcp' or 'aws'.
+# Currently acceptable values are 'gcp' or 'aws' or 'oci'.
 cloudProvider: gcp
 
 # The namespace where the kubeip-agent will be deployed.
@@ -26,6 +26,12 @@ serviceAccount:
 rbac:
   create: true
   allowNodesPatchPermission: false
+
+# Secret configuration for oci users.
+secrets:
+  create: true
+  oci_config: "" # base64 encoded oci config file
+  oci_oci_api_key: "" # base64 encoded oci api key file
 
 # DaemonSet configuration.
 daemonSet:

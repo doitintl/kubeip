@@ -27,6 +27,8 @@ func NewAssigner(ctx context.Context, logger *logrus.Entry, provider types.Cloud
 		return &azureAssigner{}, nil
 	} else if provider == types.CloudProviderGCP {
 		return NewGCPAssigner(ctx, logger, cfg.Project, cfg.Region, cfg.IPv6)
+	} else if provider == types.CloudProviderOCI {
+		return NewOCIAssigner(ctx, logger, cfg)
 	}
 	return nil, ErrUnknownCloudProvider
 }

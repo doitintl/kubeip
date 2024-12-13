@@ -42,7 +42,7 @@ func (k *kubeLeaseLock) Lock(ctx context.Context) error {
 		Factor:   1.5,         //nolint:gomnd // multiply by 1.5 on each retry
 		Jitter:   0.5,         //nolint:gomnd // add 50% jitter to wait time on each retry
 		Steps:    100,         //nolint:gomnd // retry 100 times
-		Cap:      time.Hour,   // but never wait more than 1 hour
+		Cap:      time.Hour,   //nolint:gomnd // but never wait more than 1 hour
 	}
 
 	return wait.ExponentialBackoff(backoff, func() (bool, error) { //nolint:wrapcheck

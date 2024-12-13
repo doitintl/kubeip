@@ -40,6 +40,11 @@ spec:
           imagePullPolicy: Always
           resources:
 {{- toYaml .Values.daemonSet.resources | nindent 12 }}
+          {{- if eq .Values.cloudProvider "oci" }}
+          volumeMounts:
+            - name: oci-config
+              mountPath: /root/.oci
+          {{- end }}
           env:
             - name: NODE_NAME
               valueFrom:
@@ -53,6 +58,10 @@ spec:
               value: {{ .Values.daemonSet.env.LOG_LEVEL | quote }}
             - name: LOG_JSON
               value: {{ .Values.daemonSet.env.LOG_JSON | quote }}
+            {{- if eq .Values.cloudProvider "oci" }}
+            - name: OCI_CONFIG_FILE
+              value: /root/.oci/config
+            {{- end }}
           securityContext:
             privileged: false
             allowPrivilegeEscalation: false
@@ -60,3 +69,9 @@ spec:
               drop:
                 - ALL
             readOnlyRootFilesystem: true
+      {{- if eq .Values.cloudProvider "oci" }}
+      volumes:
+        - name: oci-config
+          secret:
+            secretName: oci-config
+      {{- end }}
