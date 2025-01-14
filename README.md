@@ -6,7 +6,7 @@ Welcome to KubeIP v2, a complete overhaul of the popular [DoiT](https://www.doit
 KubeIP [v1-main](https://github.com/doitintl/kubeip/tree/v1-main) open-source project, originally developed
 by [Aviv Laufer](https://github.com/avivl).
 
-KubeIP v2 expands its support beyond Google Cloud (as in v1) to include AWS, and it's designed to be extendable to other cloud providers
+KubeIP v2 expands its support beyond Google Cloud (as in v1) to include AWS and Oracle Cloud Infrastructure(OCI), and it's designed to be extendable to other cloud providers
 that allow assigning static public IP to VMs. We've also transitioned from a Kubernetes controller to a standard DaemonSet, enhancing
 reliability and ease of use.
 
@@ -252,6 +252,93 @@ To use this feature, add the `filter` flag (or set `FILTER` environment variable
   value: "labels.env=dev;labels.app=streamer"
 ```
 
+### Oracle Cloud Infrastructure (OCI)
+
+Make sure that KubeIP DaemonSet is deployed on nodes that have a public IP (node running in public subnet). Set the [compartment OCID](https://docs.oracle.com/en-us/iaas/Content/GSG/Tasks/contactingsupport_topic-Locating_Oracle_Cloud_Infrastructure_IDs.htm#Finding_the_OCID_of_a_Compartment) in the `project` flag (or
+set `FILTER` environment variable) to the KubeIP DaemonSet:
+
+```yaml
+- name: PROJECT
+  value: "ocid1.compartment.oc1..test"
+```
+
+KubeIP will also need certain permissions to communicate with the OCI APIs. Follow these steps to set up the necessary permissions and generate the required API key and place it in the KubeIP DaemonSet:
+
+1. Create a [user and group](https://docs.oracle.com/en/cloud/paas/integration-cloud/oracle-integration-gov/create-iam-group.html) in the OCI console and add the following [policy](https://docs.oracle.com/en-us/iaas/Content/Identity/Tasks/managingpolicies.htm) to the group:
+
+   ```
+   Allow group <group_ocid> to manage public-ips in compartment id <compartment_ocid>
+   Allow group <group_ocid> to manage private-ips in compartment id <compartment_ocid>
+   Allow group <group_ocid> to manage vcns in compartment id <compartment_ocid>
+   ```
+
+2. Generate an [API Key](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#two) for the user and download the private key. Config file will look like this:
+
+   ```
+   [DEFAULT]
+   user=ocid1.user.oc1..test
+   fingerprint=
+   key_file=/root/.oci/oci_api_key.pem
+   tenancy=ocid1.tenancy.oc1..test
+   region=us-ashburn-1
+   ```
+
+3. Add the following [secret](https://kubernetes.io/docs/concepts/configuration/secret/) to the KubeIP DaemonSet:
+
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: kubeip-oci-secret
+     namespace: kube-system
+   type: Opaque
+   data:
+     config: <base64_encoded_oci_config>
+     oci_api_key.pem: <base64_encoded_oci_api_key>
+   ```
+
+4. Create a volume and mount in the KubeIP DaemonSet to mount the secret:
+
+   ```yaml
+   volumes:
+     - name: oci-config
+       secret:
+         secretName: kubeip-oci-secret
+   ```
+
+   ```yaml
+   volumeMounts:
+     - name: oci-config
+       mountPath: /root/.oci
+   ```
+
+5. Add the following environment variables to the KubeIP DaemonSet:
+   ```yaml
+   - name: OCI_CONFIG_FILE
+     value: /root/.oci/config
+   ```
+
+KubeIP supports filtering of reserved Public IPs using tags. To use this feature, add the `filter` flag (or
+set `FILTER` environment variable) to the KubeIP DaemonSet:
+
+```yaml
+- name: FILTER
+  value: "freeformTags.env=dev"
+```
+
+KubeIP OCI filter supports the following filter syntax:
+
+- `freeformTags.<key>=<value>`
+
+To specify multiple filters, separate them with a semicolon (`;`). For example:
+
+```yaml
+- name: FILTER
+  value: "freeformTags.env=dev;freeformTags.app=streamer"
+```
+
+In the case of multiple filters, they are joined with an `AND`, and the request returns only results that match all the specified filters.
+
 ## How to contribute to KubeIP?
 
 KubeIP is an open-source project, and we welcome your contributions!
@@ -287,8 +374,8 @@ OPTIONS:
    --kubeconfig value                 path to Kubernetes configuration file (not needed if running in node) [$KUBECONFIG]
    --node-name value                  Kubernetes node name (not needed if running in node) [$NODE_NAME]
    --order-by value                   order by for the IP addresses [$ORDER_BY]
-   --project value                    name of the GCP project or the AWS account ID (not needed if running in node) [$PROJECT]
-   --region value                     name of the GCP region or the AWS region (not needed if running in node) [$REGION]
+   --project value                    name of the GCP project or the AWS account ID (not needed if running in node) or OCI compartment OCID (required for OCI) [$PROJECT]
+   --region value                     name of the GCP region or the AWS region or the OCI region (not needed if running in node) [$REGION]
    --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
    --taint-key value                  specify a taint key to remove from the node once the static public IP address is assigned [$TAINT_KEY]
    --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]

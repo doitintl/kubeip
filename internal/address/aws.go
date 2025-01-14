@@ -236,7 +236,7 @@ func (a *awsAssigner) tryAssignAddress(ctx context.Context, address *types.Addre
 
 func (a *awsAssigner) getNetworkInterfaceID(instance *types.Instance) (string, error) {
 	// get network interface ID
-	if instance.NetworkInterfaces == nil || len(instance.NetworkInterfaces) == 0 {
+	if len(instance.NetworkInterfaces) == 0 {
 		return "", errors.Errorf("no network interfaces found for instance %s", *instance.InstanceId)
 	}
 	// get primary network interface ID with public IP address (DeviceIndex == 0)

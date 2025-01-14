@@ -11,9 +11,9 @@ type Config struct {
 	KubeConfigPath string `json:"kubeconfig"`
 	// NodeName is the name of the Kubernetes node
 	NodeName string `json:"node-name"`
-	// Project is the name of the GCP project or the AWS account ID
+	// Project is the name of the GCP project or the AWS account ID or the OCI compartment OCID
 	Project string `json:"project"`
-	// Region is the name of the GCP region or the AWS region
+	// Region is the name of the GCP region or the AWS region or the OCI region
 	Region string `json:"region"`
 	// IPv6 support
 	IPv6 bool `json:"ipv6"`

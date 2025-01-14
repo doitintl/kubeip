@@ -316,13 +316,13 @@ func main() {
 					},
 					&cli.StringFlag{
 						Name:     "project",
-						Usage:    "name of the GCP project or the AWS account ID (not needed if running in node)",
+						Usage:    "name of the GCP project or the AWS account ID (not needed if running in node) or OCI compartment OCID (required for OCI)",
 						EnvVars:  []string{"PROJECT"},
 						Category: "Configuration",
 					},
 					&cli.StringFlag{
 						Name:     "region",
-						Usage:    "name of the GCP region or the AWS region (not needed if running in node)",
+						Usage:    "name of the GCP region or the AWS region or the OCI region (not needed if running in node)",
 						EnvVars:  []string{"REGION"},
 						Category: "Configuration",
 					},
