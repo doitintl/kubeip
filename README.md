@@ -1,4 +1,4 @@
-![build](https://github.com/doitintl/kubeip/workflows/build/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip-agent)
+[![build](https://github.com/doitintl/kubeip/actions/workflows/build.yaml/badge.svg)](https://github.com/doitintl/kubeip/actions/workflows/build.yaml) [![Go Report Card](https://goreportcard.com/badge/github.com/doitintl/kubeip)](https://goreportcard.com/report/github.com/doitintl/kubeip) ![Docker Pulls](https://img.shields.io/docker/pulls/doitintl/kubeip-agent)
 
 # KubeIP v2
 
