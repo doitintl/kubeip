@@ -392,12 +392,13 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 					mock := mocks.NewAddressManager(t)
 					mock.EXPECT().DeleteAccessConfig("test-project", "test-zone", "test-instance-0", "test-access-config", "test-network-interface", "test-fingerprint").Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
 					mock.EXPECT().AddAccessConfig("test-project", "test-zone", "test-instance-0", "test-network-interface", "test-fingerprint", &compute.AccessConfig{
-						Name:  defaultNetworkName,
-						Type:  defaultAccessConfigType,
-						Kind:  accessConfigKind,
-						NatIP: "100.0.0.3",
+						Name:        defaultNetworkName,
+						Type:        defaultAccessConfigType,
+						Kind:        accessConfigKind,
+						NatIP:       "100.0.0.3",
+						NetworkTier: defaultNetworkTier,
 					}).Return(&compute.Operation{Name: "test-operation", Status: "DONE"}, nil)
-					mock.EXPECT().GetAddress("test-project", "test-region", "test-address-3").Return(&compute.Address{Name: "test-address-3", Status: reservedStatus}, nil)
+					mock.EXPECT().GetAddress("test-project", "test-region", "test-address-3").Return(&compute.Address{Name: "test-address-3", Status: reservedStatus, NetworkTier: defaultNetworkTier}, nil)
 					return mock
 				},
 			},
@@ -503,6 +504,23 @@ func Test_createAccessConfig(t *testing.T) {
 				Type:  defaultAccessConfigType,
 				Kind:  accessConfigKind,
 				NatIP: "100.0.0.1",
+			},
+		},
+		{
+			name: "create access config for IPv4 address with STANDARD network tier",
+			args: args{
+				address: &compute.Address{
+					Name:        "test-address",
+					Address:     "100.0.0.2",
+					NetworkTier: "STANDARD",
+				},
+			},
+			want: &compute.AccessConfig{
+				Name:        defaultNetworkName,
+				Type:        defaultAccessConfigType,
+				Kind:        accessConfigKind,
+				NatIP:       "100.0.0.2",
+				NetworkTier: "STANDARD",
 			},
 		},
 		{
