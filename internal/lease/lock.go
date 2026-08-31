@@ -39,9 +39,9 @@ func NewKubeLeaseLock(client kubernetes.Interface, leaseName, namespace, holderI
 func (k *kubeLeaseLock) Lock(ctx context.Context) error {
 	backoff := wait.Backoff{
 		Duration: time.Second, // start with 1 second
-		Factor:   1.5,         //nolint:gomnd // multiply by 1.5 on each retry
-		Jitter:   0.5,         //nolint:gomnd // add 50% jitter to wait time on each retry
-		Steps:    100,         //nolint:gomnd // retry 100 times
+		Factor:   1.5,         //nolint:mnd // multiply by 1.5 on each retry
+		Jitter:   0.5,         //nolint:mnd // add 50% jitter to wait time on each retry
+		Steps:    100,         //nolint:mnd // retry 100 times
 		Cap:      time.Hour,   // but never wait more than 1 hour
 	}
 
@@ -97,7 +97,7 @@ func (k *kubeLeaseLock) Lock(ctx context.Context) error {
 
 func (k *kubeLeaseLock) renewLeasePeriodically(ctx context.Context) {
 	// let's renew the lease every 1/2 of the lease duration; use milliseconds for ticker
-	ticker := time.NewTicker(time.Duration(k.leaseDuration*500) * time.Millisecond) //nolint:gomnd
+	ticker := time.NewTicker(time.Duration(k.leaseDuration*500) * time.Millisecond) //nolint:mnd
 	defer ticker.Stop()
 
 	for {

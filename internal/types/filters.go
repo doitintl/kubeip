@@ -40,7 +40,7 @@ func ParseFreeformTagFilter(filter string) (string, string, error) {
 	f := filter
 	if strings.HasPrefix(f, "freeformTags.") {
 		f = strings.TrimPrefix(f, "freeformTags.")
-		if split := strings.Split(f, "="); len(split) == 2 { //nolint:gomnd
+		if split := strings.Split(f, "="); len(split) == 2 { //nolint:mnd
 			return split[0], split[1], nil
 		}
 	}

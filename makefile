@@ -38,7 +38,7 @@ all: lint test build ; $(info $(M) build, test and deploy ...) @ ## release cycl
 
 # Tools
 setup-lint:
-	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.57.1
+	$(GOCMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 setup-mockery:
 	$(GOCMD) install github.com/vektra/mockery/v2@v2.35.2
 
@@ -53,7 +53,7 @@ build: ; $(info $(M) building $(GOOS)/$(GOARCH) binary...) @ ## build with local
 lint: setup-lint; $(info $(M) running golangci-lint ...) @ ## run golangci-lint linters
 	# updating path since golangci-lint is looking for go binary and this may lead to
 	# conflict when multiple go versions are installed
-	$Q $(GOLINT) run -v -c $(LINT_CONFIG) --out-format checkstyle ./... > golangci-lint.out
+	$Q $(GOLINT) run -v -c $(LINT_CONFIG) --output.checkstyle.path=golangci-lint.out ./...
 
 mock: setup-mockery ; $(info $(M) running mockery ...) @ ## run mockery to generate mocks
 	$Q $(GOMOCK) --dir internal --all --keeptree --with-expecter --exported

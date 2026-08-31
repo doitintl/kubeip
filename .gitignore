@@ -1,50 +1,71 @@
-# Binaries for programs and plugins
+# Go build, test, coverage, and profiling artifacts
+/.bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-.bin
-
-# Test binary, built with `go test -c`
 *.test
-.run
+*.out
+*.prof
+*.pprof
+*.cover
+*.coverprofile
+.run/
 
-# Local environment
+# Local Go workspaces for this single-module repository
+go.work
+go.work.sum
+
+# Local environment and credentials
 .env
+.env.*
+!.env.example
 .in
 .out
+.credentials
 
-# Local .terraform directories
+# Terraform working data and local inputs
 **/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Keep .terraform.lock.hcl files tracked for reproducible providers.
 
 # Sonar Scanner
 .scannerwork/
 
-# .tfstate files
-*.tfstate
-*.tfstate.*
-
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
+# Jekyll build output
+_site/
+.jekyll-cache/
+.jekyll-metadata
+.sass-cache/
 
 # IDE support files
-.idea
-.vscode
+.idea/
+.vscode/
 
-# MacOS file system metadata
+# Operating system metadata
 .DS_Store
+Thumbs.db
 
-# local credentials
-.credentials
-
-# Keep out some temporary example code and temprary file
+# Local scratch files
 example_code/
 older/
 temp/
-
-# Dependency directories (remove the comment below to include it)
-vendor/
-
 tmp/
+
+# Vendored Go dependencies are not used by this repository
+vendor/

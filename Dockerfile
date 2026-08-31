@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.7-alpine AS builder
 
 # add CA certificates and TZ for local time
 RUN apk --update add ca-certificates tzdata make git
