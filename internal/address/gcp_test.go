@@ -868,3 +868,35 @@ func Test_listAddressesSortsAcrossPages(t *testing.T) {
 		})
 	}
 }
+
+func Test_AddInstanceAddressRequiresCompletedOperation(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		op      *compute.Operation
+		waitErr error
+		wantErr bool
+	}{
+		{name: "completed", op: &compute.Operation{Name: "op", Status: "DONE"}},
+		{name: "completed with error", op: &compute.Operation{Name: "op", Status: "DONE", Error: &compute.OperationError{Errors: []*compute.OperationErrorErrors{{Message: "failed"}}}}, wantErr: true},
+		{name: "connection lost", op: &compute.Operation{Name: "op", Status: "RUNNING"}, waitErr: errors.New("connection reset"), wantErr: true},
+		{name: "cancelled", op: &compute.Operation{Name: "op", Status: "RUNNING"}, waitErr: context.Canceled, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			manager := mocks.NewAddressManager(t)
+			waiter := mocks.NewZoneWaiter(t)
+			manager.EXPECT().AddAccessConfig("project", "zone", "instance", "nic0", "fingerprint", tmock.Anything).Return(tt.op, nil).Once()
+			if tt.waitErr != nil {
+				call := mocks.NewWaitCall(t)
+				waiter.EXPECT().Wait("project", "zone", "op").Return(call).Once()
+				call.EXPECT().Context(tmock.Anything).Return(call).Once()
+				call.EXPECT().Do().Return(nil, tt.waitErr).Once()
+			}
+			a := &gcpAssigner{project: "project", addressManager: manager, waiter: waiter, logger: logrus.NewEntry(logrus.New())}
+			instance := &compute.Instance{Name: "instance", NetworkInterfaces: []*compute.NetworkInterface{{Name: "nic0", Fingerprint: "fingerprint"}}}
+			err := a.AddInstanceAddress(context.Background(), instance, "zone", &compute.Address{Address: "1.1.1.1", NetworkTier: "STANDARD"})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

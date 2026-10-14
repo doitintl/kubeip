@@ -132,7 +132,13 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 
 	var err error
 	name := op.Name
-	for op.Status != operationDone {
+	for {
+		if op.Error != nil {
+			return newOperationError(op.Name, op.Error)
+		}
+		if op.Status == operationDone {
+			return nil
+		}
 		// Pass the cancellable context to the Wait method
 		op, err = a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
 		if err != nil {
@@ -142,12 +148,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 			}
 			return errors.Wrapf(err, "failed to get operation %s", name)
 		}
-		// If the operation has an error, return it
-		if op != nil && op.Error != nil {
-			return newOperationError(op.Name, op.Error)
-		}
 	}
-	return nil
 }
 
 func (a *gcpAssigner) DeleteInstanceAddress(ctx context.Context, instance *compute.Instance, zone string) error {
@@ -197,12 +198,7 @@ func (a *gcpAssigner) AddInstanceAddress(ctx context.Context, instance *compute.
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		// return error if operation failed
-		if isOperationError(err) {
-			return err
-		}
-		// log error and continue (ignore non-operation errors)
-		a.logger.WithError(err).Errorf("failed waiting for operation %s", op.Name)
+		return errors.Wrap(err, "waiting for address assignment")
 	}
 	return nil
 }
