@@ -20,7 +20,7 @@ To recover unresolved intent, stop the agent on the affected node, check EC2/Clo
 
 ## AWS validation matrix
 
-Select the AWS account, region, EKS cluster, disposable node group and IPAM pool before deployment. No AWS resources have been changed by this preparation.
+The selected AWS account is `476383094422`, using local profile `thorson-sandbox1-admin`. AWS testing follows the GCP run. Select the region, EKS cluster, disposable node group and IPAM pool before deployment. No AWS resources have been changed by this preparation.
 
 1. Confirm candidate image, role permissions, empty filters, Node patch permission, and unused pool capacity. Record existing unrelated EIPs.
 2. Start one disposable node. Verify one allocation from the selected pool, both ownership tags, the Node intent, and primary-interface association.

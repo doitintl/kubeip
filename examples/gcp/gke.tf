@@ -288,7 +288,7 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
       }
       spec {
         service_account_name             = "kubeip-service-account"
-        termination_grace_period_seconds = 30
+        termination_grace_period_seconds = 330
         priority_class_name              = "system-node-critical"
         toleration {
           effect   = "NoSchedule"

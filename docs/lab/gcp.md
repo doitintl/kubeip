@@ -1,6 +1,6 @@
 # GCP lab validation
 
-Target project: `thorson-lab1-sharedvpc`. Use a disposable GKE node pool and reserved public IPv4 addresses. Select the cluster, region, node pool, service account and reservation label filter before deploying. Read-only discovery on October 14, 2026 returned no GKE clusters in this project. A disposable cluster or another selected cluster project is required before live validation. No live lab resources have been changed by this preparation. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The candidate chart and examples include this previously missing permission.
+Target project: `thorson-lab1-sharedvpc`. The October 14, 2026 disposable GKE run and its findings are recorded in [live lab results](gcp-2026-10-14.md). Use disposable nodes and reserved public IPv4 addresses for future runs. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The candidate chart and examples include this permission.
 
 Use an image built from this candidate branch, not 2.3.0. Set `AWS_IPAM_POOL_ID=""` throughout GCP validation. The AWS IPAM runbook is separate.
 
@@ -37,6 +37,8 @@ Before each cloud attempt, the agent persists pending state. A crash or uncertai
 Test a pool with more disposable nodes than addresses. Successful nodes should lose both taints; exhausted nodes should lose only completion. Restart both kinds and verify no additional cloud assignment or release occurs. Change a completed node's address externally and verify restart refuses to modify it. Deny state persistence and confirm no completion taint is removed. Delete-operation and Kubernetes patch failures must preserve unrelated resources and taints.
 
 Before changing modes, resetting terminal state or intentionally choosing a new address, drain the node, stop its agent, restore the appropriate template taints, and remove only `kubeip.com/assignment-state` after inspecting it. Restart and verify the result before uncordoning. Do not automate blind state resets.
+
+Set `terminationGracePeriodSeconds` to at least 330 when release-on-exit is enabled. The agent allows five minutes for release; a 30-second grace period can interrupt restoration of an ephemeral IP. The candidate chart and examples use 330 seconds.
 
 ## Acceptance and rollback
 

@@ -106,7 +106,7 @@ spec:
         app: kubeip
     spec:
       serviceAccountName: kubeip-service-account
-      terminationGracePeriodSeconds: 30
+      terminationGracePeriodSeconds: 330
       priorityClassName: system-node-critical
       nodeSelector:
         kubeip.com/public: "true"
