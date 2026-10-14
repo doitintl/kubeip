@@ -86,6 +86,12 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
+	if cfg.LabelAssignedAddress {
+		if err := nd.SetAssignedAddress(ctx, client, node.Name, ""); err != nil {
+			return "", errors.Wrap(err, "clearing stale assignment label")
+		}
+	}
+
 	// ticker for retry interval
 	ticker := time.NewTicker(cfg.RetryInterval)
 	defer ticker.Stop()
@@ -111,7 +117,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 				log.Debug("lock released")
 			}()
 			assignedAddress, err := assigner.Assign(ctx, node.Instance, node.Zone, cfg.Filter, cfg.OrderBy)
-			if err != nil {
+			if err != nil && !errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 				return "", err //nolint:wrapcheck
 			}
 			return assignedAddress, nil
@@ -236,23 +242,37 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 		return errors.Wrap(err, "initializing assigner")
 	}
 
+	return runNode(ctx, log, clientset, assigner, n, cfg)
+}
+
+func runNode(ctx context.Context, log *logrus.Entry, clientset kubernetes.Interface, assigner address.Assigner, n *types.Node, cfg *config.Config) error {
 	assignedAddress, err := assignAddress(ctx, log, clientset, assigner, n, cfg)
 	if err != nil {
 		return errors.Wrap(err, "assigning static public IP address")
 	}
 
-	if cfg.TaintKey != "" {
-		if err := waitForAddressToBeReported(ctx, log, explorer, n, assignedAddress, cfg); err != nil {
+	if cfg.TaintKey != "" || cfg.LabelAssignedAddress {
+		if err := waitForAddressToBeReported(ctx, log, nd.NewExplorer(clientset), n, assignedAddress, cfg); err != nil {
 			return errors.Wrap(err, "waiting for node to report assigned address")
 		}
+	}
+	if cfg.LabelAssignedAddress {
+		if assignedAddress == "" {
+			return errors.New("cannot label node with an empty assigned address")
+		}
+		if err := nd.SetAssignedAddress(ctx, clientset, n.Name, assignedAddress); err != nil {
+			return errors.Wrap(err, "setting assignment label")
+		}
+	}
 
+	if cfg.TaintKey != "" {
 		logger := log.WithField("taint-key", cfg.TaintKey)
 		tainter := nd.NewTainter(clientset)
 
 		didRemoveTaint, err := tainter.RemoveTaintKey(ctx, n, cfg.TaintKey)
 		if err != nil {
 			logger.Error("removing taint key failed, releasing static public IP address")
-			if releaseErr := releaseIP(assigner, n); releaseErr != nil { //nolint:contextcheck
+			if releaseErr := releaseIP(assigner, n, clientset, cfg.LabelAssignedAddress); releaseErr != nil { //nolint:contextcheck
 				log.WithError(releaseErr).Error("releasing static public IP address after taint key removal failed")
 			}
 			return errors.Wrap(err, "removing node taint key")
@@ -273,7 +293,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	// release the static public IP address on exit
 	if cfg.ReleaseOnExit {
 		log.Infof("releasing static public IP address")
-		if releaseErr := releaseIP(assigner, n); releaseErr != nil { //nolint:contextcheck
+		if releaseErr := releaseIP(assigner, n, clientset, cfg.LabelAssignedAddress); releaseErr != nil { //nolint:contextcheck
 			return releaseErr
 		}
 		log.Infof("static public IP address released")
@@ -281,9 +301,15 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	return nil
 }
 
-func releaseIP(assigner address.Assigner, n *types.Node) error {
+func releaseIP(assigner address.Assigner, n *types.Node, client kubernetes.Interface, labelAssignedAddress bool) error {
 	releaseCtx, releaseCancel := context.WithTimeout(context.Background(), unassignTimeout)
 	defer releaseCancel()
+
+	if labelAssignedAddress {
+		if err := nd.SetAssignedAddress(releaseCtx, client, n.Name, ""); err != nil {
+			return errors.Wrap(err, "clearing assignment label before release")
+		}
+	}
 
 	if err := assigner.Unassign(releaseCtx, n.Instance, n.Zone); err != nil {
 		return errors.Wrap(err, "failed to release static public IP address")
@@ -395,8 +421,14 @@ func main() {
 						Value:    true,
 					},
 					&cli.BoolFlag{
+						Name:     "label-assigned-address",
+						Usage:    "publish the assigned address in the kubip_assigned Node label",
+						EnvVars:  []string{"LABEL_ASSIGNED_ADDRESS"},
+						Category: "Configuration",
+					},
+					&cli.BoolFlag{
 						Name:     "wait-for-node-address",
-						Usage:    "wait for Node status to report the assigned address before removing the taint",
+						Usage:    "wait for Node status to report the assigned address before labeling or removing the taint",
 						EnvVars:  []string{"WAIT_FOR_NODE_ADDRESS"},
 						Value:    true,
 						Category: "Configuration",

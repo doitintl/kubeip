@@ -183,7 +183,7 @@ on the node, KubeIP will simply log this fact and continue normally without atte
 removing it fails for some reason, KubeIP will release the IP address back into the pool before restarting and trying again.
 
 Using this feature requires KubeIP to have permission to patch nodes. To use this feature, the `ClusterRole` resource rules need to be
-updated. **Note that if this configuration option is not set, KubeIP will not attempt to patch any nodes, and the change to the rules is not
+updated. **Note that if neither taint removal nor assignment labeling is enabled, KubeIP will not attempt to patch nodes, and the change to the rules is not
 necessary.**
 
 Please keep in mind that this will give KubeIP permission to make updates to any node in your cluster, so please make sure that this aligns
@@ -195,6 +195,37 @@ rules:
     resources: [ "nodes" ]
     verbs: [ "get", "patch" ]
 ```
+
+### Assignment label (v1 compatibility)
+
+Set `LABEL_ASSIGNED_ADDRESS=true` (or `--label-assigned-address`) to publish the
+assigned address in the Kubernetes Node label `kubip_assigned`. This preserves the
+v1 spelling and IPv4 format: `203.0.113.10` becomes `203-0-113-10`. IPv6 addresses
+use 32 lowercase hexadecimal digits without separators, so the value is a valid
+Kubernetes label. This labels the Kubernetes Node, not the cloud instance.
+
+Labeling is disabled by default and requires `get` and `patch` permission on nodes.
+KubeIP only changes `kubip_assigned`; it never copies address labels or clears
+unrelated Node labels. Do not use this output label to select the KubeIP DaemonSet
+itself, because the agent must run before it can set the label.
+
+Before assignment, the agent removes any stale assignment label. It restores the
+label after successful assignment, including an already-assigned address on
+restart. `WAIT_FOR_NODE_ADDRESS=true` also applies to labeling, even without a
+taint; set it to false for cloud-assignment-only readiness. A failed label update
+returns an error and leaves the configured readiness taint in place.
+
+When releasing an address, the agent removes the label first. If label cleanup
+fails, it retains the address and reports an error. If `RELEASE_ON_EXIT=false`,
+the address and label remain. Unlike v1, cleanup deletes the key instead of
+writing `0-0-0-0`, so an `Exists` selector does not match a released address.
+Label removal does not evict running pods, and the label is not a continuous
+cloud-health check.
+
+This feature requires an agent build containing `--label-assigned-address`; it is
+not included in agent 2.3.0. In a chart version supporting this setting, enable
+`daemonSet.env.LABEL_ASSIGNED_ADDRESS` and `rbac.allowNodesPatchPermission`, and
+select a compatible agent image.
 
 ### AWS
 
@@ -386,6 +417,7 @@ OPTIONS:
    --region value                     name of the GCP region or the AWS region or the OCI region (not needed if running in node) [$REGION]
    --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
    --wait-for-node-address            wait for Node status before removing the taint (default: true) [$WAIT_FOR_NODE_ADDRESS]
+   --label-assigned-address          publish the assigned address in the kubip_assigned Node label (default: false) [$LABEL_ASSIGNED_ADDRESS]
    --taint-key value                  specify a taint key to remove from the node once the static public IP address is assigned [$TAINT_KEY]
    --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]
    --retry-interval value             when the agent fails to assign the static public IP address, it will retry after this interval (default: 5m0s) [$RETRY_INTERVAL]

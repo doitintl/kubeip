@@ -7,7 +7,9 @@ import (
 )
 
 type Config struct {
-	// WaitForNodeAddress waits for Node status before removing the assignment taint.
+	// LabelAssignedAddress publishes the assigned address in the legacy Node label.
+	LabelAssignedAddress bool `json:"label-assigned-address"`
+	// WaitForNodeAddress waits for Node status before labeling or removing the assignment taint.
 	WaitForNodeAddress bool `json:"wait-for-node-address"`
 	// KubeConfigPath is the path to the kubeconfig file
 	KubeConfigPath string `json:"kubeconfig"`
@@ -41,6 +43,7 @@ type Config struct {
 
 func NewConfig(c *cli.Context) *Config {
 	var cfg Config
+	cfg.LabelAssignedAddress = c.Bool("label-assigned-address")
 	cfg.WaitForNodeAddress = c.Bool("wait-for-node-address")
 	cfg.KubeConfigPath = c.String("kubeconfig")
 	cfg.NodeName = c.String("node-name")
