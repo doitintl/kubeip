@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 	"github.com/doitintl/kubeip/internal/config"
 	nodetypes "github.com/doitintl/kubeip/internal/types"
 	"github.com/sirupsen/logrus"
@@ -22,6 +23,7 @@ type ipamFixture struct {
 	allocated, associated, disassociated, released           int
 	allocateErr, associateErr, releaseErr, listErr, stateErr error
 	hidden                                                   bool
+	releaseBusy                                              int
 }
 
 func newIPAMFixture(t *testing.T) (*awsAssigner, *ipamFixture) {
@@ -72,6 +74,10 @@ func (f *ipamFixture) AllocateAddress(_ context.Context, in *ec2.AllocateAddress
 func (f *ipamFixture) ReleaseAddress(_ context.Context, in *ec2.ReleaseAddressInput, _ ...func(*ec2.Options)) (*ec2.ReleaseAddressOutput, error) {
 	require.Equal(f.t, "eipalloc-test", aws.ToString(in.AllocationId))
 	f.released++
+	if f.releaseBusy > 0 {
+		f.releaseBusy--
+		return nil, &smithy.GenericAPIError{Code: "InvalidIPAddress.InUse", Message: "disassociation pending"}
+	}
 	if f.releaseErr == nil {
 		f.addresses = nil
 	}
@@ -226,4 +232,39 @@ func TestIPAMConfiguration(t *testing.T) {
 		_, err := NewAssigner(context.Background(), logrus.NewEntry(logrus.New()), nodetypes.CloudProviderAWS, cfg, f)
 		require.Error(t, err)
 	}
+}
+
+func TestIPAMRecoveryWithoutPublicAddress(t *testing.T) {
+	t.Parallel()
+	a, f := newIPAMFixture(t)
+	f.instance.PublicIpAddress = nil
+	f.instance.NetworkInterfaces[0].Association = nil
+	_, err := a.Assign(context.Background(), "i-test", "", nil, "")
+	require.NoError(t, err)
+	require.Equal(t, 1, f.allocated)
+	require.Equal(t, 1, f.associated)
+}
+func TestIPAMReleaseWaitsForDisassociation(t *testing.T) {
+	t.Parallel()
+	a, f := newIPAMFixture(t)
+	_, err := a.Assign(context.Background(), "i-test", "", nil, "")
+	require.NoError(t, err)
+	f.releaseBusy = 2
+	require.NoError(t, a.Unassign(context.Background(), "i-test", ""))
+	require.Equal(t, 1, f.disassociated)
+	require.Equal(t, 3, f.released)
+	require.Empty(t, f.state)
+}
+
+func TestIPAMReleaseCancellationRetainsIntent(t *testing.T) {
+	t.Parallel()
+	a, f := newIPAMFixture(t)
+	_, err := a.Assign(context.Background(), "i-test", "", nil, "")
+	require.NoError(t, err)
+	f.releaseBusy = 100
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, a.Unassign(ctx, "i-test", ""), context.Canceled)
+	require.Equal(t, 1, f.released)
+	require.NotEmpty(t, f.state)
 }

@@ -2,10 +2,12 @@ package address
 
 import (
 	"context"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	"github.com/aws/smithy-go"
 	"github.com/pkg/errors"
 )
 
@@ -133,7 +135,7 @@ func (a *awsAssigner) releaseIPAM(ctx context.Context, instanceID string) error 
 			return errors.Wrap(err, "disassociating IPAM address")
 		}
 	}
-	if _, err := a.ipamClient.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{AllocationId: address.AllocationId}); err != nil {
+	if err := a.releaseIPAMAllocation(ctx, address.AllocationId); err != nil {
 		return errors.Wrap(err, "releasing owned IPAM allocation")
 	}
 	return errors.Wrap(a.ipamState.CompareAndSwap(ctx, intent, ""), "clearing released IPAM intent")
@@ -166,4 +168,24 @@ func (a *awsAssigner) checkIPAMPrimary(ctx context.Context, instanceID string, a
 		return errors.New("primary interface already has an Elastic IP not owned by this IPAM configuration")
 	}
 	return nil
+}
+
+// Disassociation can succeed before ReleaseAddress observes that the address is free.
+func (a *awsAssigner) releaseIPAMAllocation(ctx context.Context, allocationID *string) error {
+	const maxRetries = 10
+	for attempt := 0; ; attempt++ {
+		_, err := a.ipamClient.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{AllocationId: allocationID})
+		if err == nil {
+			return nil
+		}
+		var apiErr smithy.APIError
+		if !errors.As(err, &apiErr) || apiErr.ErrorCode() != "InvalidIPAddress.InUse" || attempt >= maxRetries {
+			return errors.Wrap(err, "releasing IPAM address")
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			return errors.Wrap(ctx.Err(), "waiting for IPAM disassociation")
+		}
+	}
 }

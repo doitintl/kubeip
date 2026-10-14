@@ -251,16 +251,20 @@ func (a *awsAssigner) getNetworkInterfaceID(instance *types.Instance) (string, e
 	if len(instance.NetworkInterfaces) == 0 {
 		return "", errors.Errorf("no network interfaces found for instance %s", *instance.InstanceId)
 	}
-	// get primary network interface ID with public IP address (DeviceIndex == 0)
+	// IPAM recovery can follow a release that left the primary interface without a public IP.
 	networkInterfaceID := ""
 	for _, ni := range instance.NetworkInterfaces {
-		if ni.Association != nil && ni.Association.PublicIp != nil &&
+		hasPublicIP := ni.Association != nil && ni.Association.PublicIp != nil
+		if (a.ipamPoolID != "" || hasPublicIP) && ni.NetworkInterfaceId != nil &&
 			ni.Attachment != nil && ni.Attachment.DeviceIndex != nil && *ni.Attachment.DeviceIndex == 0 {
 			networkInterfaceID = *ni.NetworkInterfaceId
 			break
 		}
 	}
 	if networkInterfaceID == "" {
+		if a.ipamPoolID != "" {
+			return "", errors.Errorf("no primary network interface found for instance %s", *instance.InstanceId)
+		}
 		return "", errors.Errorf("no network interfaces with public IP address found for instance %s", *instance.InstanceId)
 	}
 	return networkInterfaceID, nil
