@@ -49,6 +49,10 @@ func (t *tainter) RemoveTaintKey(ctx context.Context, node *types.Node, taintKey
 		return false, errors.Wrap(err, "failed to get kubernetes node")
 	}
 
+	if string(n.UID) != node.UID {
+		return false, errors.New("node was replaced; refusing to remove taints")
+	}
+
 	// Remove taint from the node representation
 	newTaints, didDelete := deleteTaintsByKey(n.Spec.Taints, taintKey)
 	if !didDelete {
@@ -63,7 +67,7 @@ func (t *tainter) RemoveTaintKey(ctx context.Context, node *types.Node, taintKey
 	}
 
 	// Patch the node with only the remaining taints
-	patch := fmt.Sprintf(`{"spec":{"taints":%v}}`, string(newTaintsMarshaled))
+	patch := fmt.Sprintf(`{"metadata":{"uid":%q,"resourceVersion":%q},"spec":{"taints":%v}}`, n.UID, n.ResourceVersion, string(newTaintsMarshaled))
 	_, err = t.client.CoreV1().Nodes().Patch(ctx, node.Name, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrap(err, "failed to patch node taints")

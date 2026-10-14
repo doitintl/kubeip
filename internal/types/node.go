@@ -15,6 +15,7 @@ const (
 )
 
 type Node struct {
+	UID         string
 	Name        string
 	Instance    string
 	Cloud       CloudProvider

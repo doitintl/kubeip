@@ -1,12 +1,18 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
 )
 
 type Config struct {
+	CompletionTaintKey string        `json:"completion-taint-key"`
+	ReconcileInterval  time.Duration `json:"reconcile-interval"`
+	MetricsAddress     string        `json:"metrics-address"`
+	// AWSIPAMPoolID enables allocation from an AWS public IPv4 IPAM pool.
+	AWSIPAMPoolID string `json:"aws-ipam-pool-id"`
 	// LabelAssignedAddress publishes the assigned address in the legacy Node label.
 	LabelAssignedAddress bool `json:"label-assigned-address"`
 	// WaitForNodeAddress waits for Node status before labeling or removing the assignment taint.
@@ -43,6 +49,10 @@ type Config struct {
 
 func NewConfig(c *cli.Context) *Config {
 	var cfg Config
+	cfg.CompletionTaintKey = c.String("completion-taint-key")
+	cfg.ReconcileInterval = c.Duration("reconcile-interval")
+	cfg.MetricsAddress = c.String("metrics-address")
+	cfg.AWSIPAMPoolID = c.String("aws-ipam-pool-id")
 	cfg.LabelAssignedAddress = c.Bool("label-assigned-address")
 	cfg.WaitForNodeAddress = c.Bool("wait-for-node-address")
 	cfg.KubeConfigPath = c.String("kubeconfig")
@@ -50,7 +60,11 @@ func NewConfig(c *cli.Context) *Config {
 	cfg.DevelopMode = c.Bool("develop-mode")
 	cfg.RetryInterval = c.Duration("retry-interval")
 	cfg.RetryAttempts = c.Int("retry-attempts")
-	cfg.Filter = c.StringSlice("filter")
+	for _, filter := range c.StringSlice("filter") {
+		if strings.TrimSpace(filter) != "" {
+			cfg.Filter = append(cfg.Filter, filter)
+		}
+	}
 	cfg.OrderBy = c.String("order-by")
 	cfg.Project = c.String("project")
 	cfg.Region = c.String("region")

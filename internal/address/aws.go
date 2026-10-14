@@ -18,6 +18,9 @@ const (
 )
 
 type awsAssigner struct {
+	ipamPoolID     string
+	ipamClient     ipamAPI
+	ipamState      IPAMState
 	region         string
 	logger         *logrus.Entry
 	instanceGetter cloud.Ec2InstanceGetter
@@ -25,7 +28,7 @@ type awsAssigner struct {
 	eipAssigner    cloud.EipAssigner
 }
 
-func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (Assigner, error) {
+func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region, ipamPoolID string, state IPAMState) (Assigner, error) {
 	// initialize AWS client
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
@@ -46,6 +49,9 @@ func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (A
 
 	return &awsAssigner{
 		region:         region,
+		ipamPoolID:     ipamPoolID,
+		ipamClient:     client,
+		ipamState:      state,
 		logger:         logger,
 		instanceGetter: instanceGetter,
 		eipLister:      eipLister,
@@ -166,6 +172,9 @@ func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationI
 }
 
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) (string, error) {
+	if a.ipamPoolID != "" {
+		return a.assignIPAM(ctx, instanceID)
+	}
 	// get elastic IP attached to the instance
 	assigned, err := a.getAssignedElasticIP(ctx, instanceID)
 	if err == nil {
@@ -242,16 +251,20 @@ func (a *awsAssigner) getNetworkInterfaceID(instance *types.Instance) (string, e
 	if len(instance.NetworkInterfaces) == 0 {
 		return "", errors.Errorf("no network interfaces found for instance %s", *instance.InstanceId)
 	}
-	// get primary network interface ID with public IP address (DeviceIndex == 0)
+	// IPAM recovery can follow a release that left the primary interface without a public IP.
 	networkInterfaceID := ""
 	for _, ni := range instance.NetworkInterfaces {
-		if ni.Association != nil && ni.Association.PublicIp != nil &&
+		hasPublicIP := ni.Association != nil && ni.Association.PublicIp != nil
+		if (a.ipamPoolID != "" || hasPublicIP) && ni.NetworkInterfaceId != nil &&
 			ni.Attachment != nil && ni.Attachment.DeviceIndex != nil && *ni.Attachment.DeviceIndex == 0 {
 			networkInterfaceID = *ni.NetworkInterfaceId
 			break
 		}
 	}
 	if networkInterfaceID == "" {
+		if a.ipamPoolID != "" {
+			return "", errors.Errorf("no primary network interface found for instance %s", *instance.InstanceId)
+		}
 		return "", errors.Errorf("no network interfaces with public IP address found for instance %s", *instance.InstanceId)
 	}
 	return networkInterfaceID, nil
@@ -295,7 +308,7 @@ func (a *awsAssigner) getAvailableElasticIPs(ctx context.Context, filter []strin
 		return nil, errors.Wrap(err, "failed to list available elastic IPs")
 	}
 	if len(addresses) == 0 {
-		return nil, errors.Errorf("no available elastic IPs")
+		return nil, ErrNoAvailableAddresses
 	}
 	// sort addresses by orderBy field
 	sortAddressesByField(addresses, orderBy)
@@ -310,6 +323,9 @@ func (a *awsAssigner) getAvailableElasticIPs(ctx context.Context, filter []strin
 }
 
 func (a *awsAssigner) Unassign(ctx context.Context, instanceID, _ string) error {
+	if a.ipamPoolID != "" {
+		return a.releaseIPAM(ctx, instanceID)
+	}
 	// get elastic IP attached to the instance
 	address, err := a.getAssignedElasticIP(ctx, instanceID)
 	if err != nil {

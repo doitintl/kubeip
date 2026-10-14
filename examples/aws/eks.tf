@@ -170,7 +170,7 @@ resource "kubernetes_cluster_role" "kubeip_cluster_role" {
   rule {
     api_groups = ["coordination.k8s.io"]
     resources  = ["leases"]
-    verbs      = ["create", "delete", "get"]
+    verbs      = ["create", "delete", "get", "update"]
   }
   depends_on = [
     kubernetes_service_account.kubeip_service_account,
@@ -229,7 +229,7 @@ resource "kubernetes_daemonset" "kubeip_daemonset" {
       }
       spec {
         service_account_name             = "kubeip-service-account"
-        termination_grace_period_seconds = 30
+        termination_grace_period_seconds = 330
         priority_class_name              = "system-node-critical"
         toleration {
           effect   = "NoSchedule"

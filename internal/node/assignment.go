@@ -18,7 +18,7 @@ import (
 const AssignedAddressLabel = "kubip_assigned"
 
 // SetAssignedAddress patches only the assignment label. An empty address removes it.
-func SetAssignedAddress(ctx context.Context, client kubernetes.Interface, nodeName, address string) error {
+func SetAssignedAddress(ctx context.Context, client kubernetes.Interface, nodeName, address, uid string) error {
 	var value *string
 	if address != "" {
 		ip, err := netip.ParseAddr(address)
@@ -32,9 +32,11 @@ func SetAssignedAddress(ctx context.Context, client kubernetes.Interface, nodeNa
 		}
 		value = &label
 	}
-	patch, err := json.Marshal(map[string]any{
-		"metadata": map[string]any{"labels": map[string]*string{AssignedAddressLabel: value}},
-	})
+	metadata := map[string]any{"labels": map[string]*string{AssignedAddressLabel: value}}
+	if uid != "" {
+		metadata["uid"] = uid
+	}
+	patch, err := json.Marshal(map[string]any{"metadata": metadata})
 	if err != nil {
 		return errors.Wrap(err, "encoding assignment label patch")
 	}

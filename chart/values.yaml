@@ -35,7 +35,7 @@ secrets:
 
 # DaemonSet configuration.
 daemonSet:
-  terminationGracePeriodSeconds: 30
+  terminationGracePeriodSeconds: 330
   priorityClassName: system-node-critical
   nodeSelector:
     nodegroup: public

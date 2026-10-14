@@ -3,6 +3,7 @@ package address
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -57,11 +58,6 @@ type operationError struct {
 
 func newOperationError(name string, err *compute.OperationError) *operationError {
 	return &operationError{name: name, err: err}
-}
-
-func isOperationError(err error) bool {
-	_, ok := err.(*operationError) //nolint:errorlint
-	return ok
 }
 
 func joinErrorMessages(operationError *compute.OperationError) string {
@@ -130,7 +126,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 	ctx, cancel := context.WithTimeout(c, timeout)
 	defer cancel()
 
-	var err error
+	transportRetries := 0
 	name := op.Name
 	for {
 		if op.Error != nil {
@@ -140,14 +136,26 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 			return nil
 		}
 		// Pass the cancellable context to the Wait method
-		op, err = a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
+		next, err := a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
 		if err != nil {
-			// If the context was cancelled, return a timeout error
-			if errors.Is(err, context.Canceled) {
-				return errors.New("operation timed out")
+			if ctx.Err() != nil {
+				return errors.Wrap(ctx.Err(), "waiting for operation")
+			}
+			var networkError net.Error
+			if errors.As(err, &networkError) && transportRetries < 3 {
+				transportRetries++
+				// Recheck the same operation after changing the node's egress IP.
+				select {
+				case <-time.After(time.Second):
+					continue
+				case <-ctx.Done():
+					return errors.Wrap(ctx.Err(), "waiting for operation")
+				}
 			}
 			return errors.Wrapf(err, "failed to get operation %s", name)
 		}
+		op = next
+		transportRetries = 0
 	}
 }
 
@@ -172,12 +180,7 @@ func (a *gcpAssigner) DeleteInstanceAddress(ctx context.Context, instance *compu
 	}
 	// wait for operation to complete
 	if err = a.waitForOperation(ctx, op, zone, defaultTimeout); err != nil {
-		// return error if operation failed
-		if isOperationError(err) {
-			return err
-		}
-		// log error and continue (ignore non-operation errors)
-		a.logger.WithError(err).Errorf("failed waiting for operation %s", op.Name)
+		return errors.Wrap(err, "waiting for address removal")
 	}
 	return nil
 }
@@ -213,7 +216,7 @@ func (a *gcpAssigner) CheckAddressAssigned(region, addressName string) (bool, er
 
 func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filter []string, orderBy string) (string, error) {
 	// check if instance already has a public static IP address assigned
-	instance, address, err := a.checkStaticIPAssigned(zone, instanceID)
+	instance, address, err := a.checkStaticIPAssigned(ctx, zone, instanceID)
 	if err != nil {
 		if errors.Is(err, ErrStaticIPAlreadyAssigned) {
 			return address, nil
@@ -222,12 +225,12 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	}
 
 	// get available reserved public IP addresses
-	addresses, err := a.listAddresses(filter, orderBy, reservedStatus)
+	addresses, err := a.listAddressesContext(ctx, filter, orderBy, reservedStatus)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to list available addresses")
 	}
 	if len(addresses) == 0 {
-		return "", errors.Errorf("no available addresses")
+		return "", ErrNoAvailableAddresses
 	}
 	// log available addresses IPs
 	ips := make([]string, 0, len(addresses))
@@ -269,12 +272,12 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	return assignedAddress, nil
 }
 
-func (a *gcpAssigner) checkStaticIPAssigned(zone, instanceID string) (*compute.Instance, string, error) {
+func (a *gcpAssigner) checkStaticIPAssigned(ctx context.Context, zone, instanceID string) (*compute.Instance, string, error) {
 	instance, err := a.instanceGetter.Get(a.project, zone, instanceID)
 	if err != nil {
 		return nil, "", errors.Wrapf(err, "failed to get instance %s", instanceID)
 	}
-	assigned, err := a.listAddresses(nil, "", inUseStatus)
+	assigned, err := a.listAddressesContext(ctx, nil, "", inUseStatus)
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to list assigned addresses")
 	}
@@ -307,8 +310,13 @@ func (a *gcpAssigner) checkStaticIPAssigned(zone, instanceID string) (*compute.I
 	return instance, "", nil
 }
 
-func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]*compute.Address, error) {
+func (a *gcpAssigner) listAddressesContext(ctx context.Context, filter []string, orderBy, status string) ([]*compute.Address, error) {
 	call := a.lister.List(a.project, a.region)
+	if contextual, ok := call.(interface {
+		WithContext(context.Context) cloud.ListCall
+	}); ok {
+		call = contextual.WithContext(ctx)
+	}
 	// Initialize filters with known filters
 	filters := []string{
 		fmt.Sprintf("(status=%s)", status),
@@ -351,7 +359,7 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 		return errors.Wrapf(err, "failed to get instance %s", instanceID)
 	}
 	// list all assigned addresses
-	assigned, err := a.listAddresses(nil, "", inUseStatus)
+	assigned, err := a.listAddressesContext(ctx, nil, "", inUseStatus)
 	if err != nil {
 		return errors.Wrap(err, "failed to list assigned addresses")
 	}
