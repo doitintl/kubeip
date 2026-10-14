@@ -466,15 +466,16 @@ func addressPrefixLengthOrDefault(address *compute.Address) int64 {
 
 // sortGCPAddresses sorts after pagination because the API cannot combine all filters with ordering.
 func sortGCPAddresses(addresses []*compute.Address, orderBy string) error {
+	const maxOrderFields = 2
 	if orderBy == "" {
 		return nil
 	}
 	fields := strings.Fields(orderBy)
-	if len(fields) == 0 || len(fields) > 2 || (fields[0] != "name" && fields[0] != "creationTimestamp") {
+	if len(fields) == 0 || len(fields) > maxOrderFields || (fields[0] != "name" && fields[0] != "creationTimestamp") {
 		return errors.Errorf("unsupported address order %q: use name or creationTimestamp with optional asc or desc", orderBy)
 	}
-	descending := len(fields) == 2 && fields[1] == "desc"
-	if len(fields) == 2 && fields[1] != "asc" && !descending {
+	descending := len(fields) == maxOrderFields && fields[1] == "desc"
+	if len(fields) == maxOrderFields && fields[1] != "asc" && !descending {
 		return errors.Errorf("unsupported address sort direction %q", fields[1])
 	}
 	timestamps := make(map[*compute.Address]time.Time, len(addresses))
