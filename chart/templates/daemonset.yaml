@@ -36,7 +36,7 @@ spec:
         fsGroup: 1001
       containers:
         - name: kubeip
-          image: "{{ .Values.image.repository }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: Always
           resources:
 {{- toYaml .Values.daemonSet.resources | nindent 12 }}
