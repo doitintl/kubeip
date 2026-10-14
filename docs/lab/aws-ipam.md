@@ -20,7 +20,7 @@ To recover unresolved intent, stop the agent on the affected node, check EC2/Clo
 
 ## AWS validation matrix
 
-The selected AWS account is `476383094422`, using local profile `thorson-sandbox1-admin`. The October 14 run used disposable resources in `us-west-2`; see [live results and deployment requirements](aws-2026-10-14.md). The matrix below remains the acceptance checklist for future runs.
+Select a disposable AWS account, region, cluster, node group and IPAM pool before running this acceptance checklist.
 
 1. Confirm candidate image, role permissions, empty filters, Node patch permission, and unused pool capacity. Record existing unrelated EIPs.
 2. Start one disposable node. Verify one allocation from the selected pool, both ownership tags, the Node intent, and primary-interface association.
@@ -32,4 +32,4 @@ The selected AWS account is `476383094422`, using local profile `thorson-sandbox
 8. Enable release and stop the pod normally. Confirm disassociation, release to the pool, and intent removal. Repeat with denied release and confirm intent persists until recovery.
 9. Verify unrelated EIPs, node labels and annotations remain unchanged. Remove only the lab's owned resources after verifying IDs and ownership.
 
-Unit tests cover allocation request tags, disabled SDK retries, restart reuse, delayed discovery after a lost response, retained allocation after association failure, ownership refusal, state/configuration errors, release failure, and Node patch preconditions. Live results and limitations are recorded in the [AWS lab report](aws-2026-10-14.md).
+Unit tests cover allocation request tags, disabled SDK retries, restart reuse, delayed discovery after a lost response, retained allocation after association failure, ownership refusal, state/configuration errors, release failure, and Node patch preconditions.
