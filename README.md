@@ -138,7 +138,9 @@ nodes.
 
 To enable this feature, set the `taint-key` configuration parameter (See [How to run KubeIP](#how-to-run-kubeip)) to the taint key that
 should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes. For example,
-given that new nodes are created with a taint key of `kubeip.com/not-ready`:
+Configure the taint on the node pool so replacement and autoscaled nodes inherit it.
+The startup-taint prefix lets Cluster Autoscaler account for nodes that are still initializing. For example,
+given that new nodes are created with a taint key of `startup-taint.cluster-autoscaler.kubernetes.io/kubeip-not-ready`:
 
 ```yaml
 kind: DaemonSet
@@ -147,7 +149,7 @@ spec:
     spec:
       serviceAccountName: kubeip-service-account
       tolerations:
-        - key: kubeip.com/not-ready
+        - key: startup-taint.cluster-autoscaler.kubernetes.io/kubeip-not-ready
           operator: Exists
           effect: NoSchedule
       securityContext:
@@ -160,7 +162,7 @@ spec:
           image: doitintl/kubeip-agent
           env:
             - name: TAINT_KEY
-              value: kubeip.com/not-ready
+              value: startup-taint.cluster-autoscaler.kubernetes.io/kubeip-not-ready
           securityContext:
             privileged: false
             allowPrivilegeEscalation: false
