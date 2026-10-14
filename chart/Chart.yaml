@@ -1,4 +1,7 @@
 apiVersion: v2
 name: kubeip
 description: A Helm chart for KubeIP
-version: 0.1.0
+version: 0.2.0
+home: https://kubeip.com
+sources:
+  - https://github.com/doitintl/kubeip

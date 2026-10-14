@@ -448,3 +448,16 @@ cd examples/gcp
 terraform init
 terraform apply -var="project_id=<your-project-id>" -var="ipv6_support=true"
 ```
+
+### GCP address ordering
+
+GCP address filters are applied by the API. KubeIP sorts the combined results from
+all pages locally when `ORDER_BY` is set. Supported fields are `name` and
+`creationTimestamp`, optionally followed by `asc` or `desc`. For example,
+`ORDER_BY="creationTimestamp desc"` selects newer available reservations first.
+Invalid ordering expressions fail without changing the instance address.
+
+### Helm chart releases
+
+See the [chart documentation](chart/README.md) for installation, version pinning,
+and the chart publication workflow.
