@@ -38,7 +38,7 @@ func TestGCPRestoreAddress(t *testing.T) {
 					}
 					write(&compute.Instance{Name: "instance", NetworkInterfaces: []*compute.NetworkInterface{nic}})
 				case strings.HasSuffix(r.URL.Path, "/addresses"):
-					require.Contains(t, r.URL.Query().Get("filter"), "(address=203.0.113.10)")
+					require.Contains(t, r.URL.Query().Get("filter"), `(address="203.0.113.10")`)
 					require.Contains(t, r.URL.Query().Get("filter"), "(labels.pool=lab)")
 					if scenario == "occupied" {
 						write(&compute.AddressList{})

@@ -2,6 +2,7 @@ package address
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/pkg/errors"
@@ -66,7 +67,7 @@ func (a *gcpAssigner) RestoreAddress(ctx context.Context, instance, zone, expect
 	if current == expected {
 		return nil
 	}
-	filters := append(append([]string{}, filter...), "address="+expected)
+	filters := append(append([]string{}, filter...), "address="+strconv.Quote(expected))
 	addresses, err := a.listAddressesContext(ctx, filters, "", reservedStatus)
 	if err != nil {
 		return err
