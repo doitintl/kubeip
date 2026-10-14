@@ -35,4 +35,3 @@ jobs:
         with:
           name: helm-chart
           path: dist/*.tgz
-
