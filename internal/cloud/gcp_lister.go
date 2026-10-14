@@ -1,6 +1,10 @@
 package cloud
 
-import "google.golang.org/api/compute/v1"
+import (
+	"context"
+
+	"google.golang.org/api/compute/v1"
+)
 
 type ListCall interface {
 	Filter(filter string) ListCall
@@ -43,4 +47,8 @@ func (c *gcpListCall) PageToken(pageToken string) ListCall {
 
 func (c *gcpListCall) Do() (*compute.AddressList, error) {
 	return c.call.Do() //nolint:wrapcheck
+}
+
+func (c *gcpListCall) WithContext(ctx context.Context) ListCall {
+	return &gcpListCall{c.call.Context(ctx)}
 }

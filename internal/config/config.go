@@ -7,6 +7,9 @@ import (
 )
 
 type Config struct {
+	CompletionTaintKey string        `json:"completion-taint-key"`
+	ReconcileInterval  time.Duration `json:"reconcile-interval"`
+	MetricsAddress     string        `json:"metrics-address"`
 	// AWSIPAMPoolID enables allocation from an AWS public IPv4 IPAM pool.
 	AWSIPAMPoolID string `json:"aws-ipam-pool-id"`
 	// LabelAssignedAddress publishes the assigned address in the legacy Node label.
@@ -45,6 +48,9 @@ type Config struct {
 
 func NewConfig(c *cli.Context) *Config {
 	var cfg Config
+	cfg.CompletionTaintKey = c.String("completion-taint-key")
+	cfg.ReconcileInterval = c.Duration("reconcile-interval")
+	cfg.MetricsAddress = c.String("metrics-address")
 	cfg.AWSIPAMPoolID = c.String("aws-ipam-pool-id")
 	cfg.LabelAssignedAddress = c.Bool("label-assigned-address")
 	cfg.WaitForNodeAddress = c.Bool("wait-for-node-address")

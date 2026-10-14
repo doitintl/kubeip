@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	ErrNoAvailableAddresses     = errors.New("no available addresses")
 	ErrInvalidIPAMConfiguration = errors.New("AWS IPAM requires AWS IPv4, a Node state store, and empty FILTER and ORDER_BY")
 	ErrUnknownCloudProvider     = errors.New("unknown cloud provider")
 	ErrStaticIPAlreadyAssigned  = errors.New("static public IP already assigned")

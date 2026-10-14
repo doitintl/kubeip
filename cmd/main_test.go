@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -413,7 +414,7 @@ func Test_finalAttemptDoesNotWait(t *testing.T) {
 				explorer.EXPECT().GetNode(tmock.Anything, n.Name).Return(&types.Node{}, nil).Once()
 				err = waitForAddressToBeReported(ctx, log, explorer, n, "1.1.1.1", cfg)
 			}
-			if err == nil || err.Error() != "reached maximum number of retries" {
+			if err == nil || !strings.HasPrefix(err.Error(), "reached maximum number of retries") {
 				t.Fatalf("expected exhausted retries without waiting, got %v", err)
 			}
 		})

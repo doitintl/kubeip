@@ -112,7 +112,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 				region:  tt.fields.region,
 				logger:  logger,
 			}
-			got, err := a.listAddresses(tt.args.filter, tt.args.orderBy, tt.args.status)
+			got, err := a.listAddressesContext(context.Background(), tt.args.filter, tt.args.orderBy, tt.args.status)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("listAddresses() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -866,7 +866,7 @@ func Test_listAddressesSortsAcrossPages(t *testing.T) {
 			call.EXPECT().PageToken("next").Return(call).Once()
 			call.EXPECT().Do().Return(&compute.AddressList{Items: []*compute.Address{{Name: "a", CreationTimestamp: "2026-10-14T09:00:00Z"}}}, nil).Once()
 			assigner := &gcpAssigner{lister: lister, project: "project", region: "region"}
-			got, err := assigner.listAddresses([]string{"labels.env=test"}, tt.order, reservedStatus)
+			got, err := assigner.listAddressesContext(context.Background(), []string{"labels.env=test"}, tt.order, reservedStatus)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("error = %v", err)
 			}
@@ -938,7 +938,7 @@ func Test_checkStaticIPAssignedUsesManagedInterface(t *testing.T) {
 				}
 				call.EXPECT().Do().Return(&compute.AddressList{Items: addresses}, nil)
 				a := &gcpAssigner{project: "project", region: "region", ipv6: ipv6, instanceGetter: getter, lister: lister}
-				gotInstance, ip, err := a.checkStaticIPAssigned("zone", "instance")
+				gotInstance, ip, err := a.checkStaticIPAssigned(context.Background(), "zone", "instance")
 				if primaryReserved {
 					if !errors.Is(err, ErrStaticIPAlreadyAssigned) || ip != primaryIP {
 						t.Fatalf("ip=%q err=%v", ip, err)

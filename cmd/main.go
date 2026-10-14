@@ -11,6 +11,7 @@ import (
 	"github.com/doitintl/kubeip/internal/config"
 	"github.com/doitintl/kubeip/internal/lease"
 	nd "github.com/doitintl/kubeip/internal/node"
+	"github.com/doitintl/kubeip/internal/telemetry"
 	"github.com/doitintl/kubeip/internal/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -83,6 +84,9 @@ func prepareLogger(level string, json bool) *logrus.Entry {
 }
 
 func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Interface, assigner address.Assigner, node *types.Node, cfg *config.Config) (string, error) {
+	if cfg.RetryAttempts < 0 || cfg.RetryInterval <= 0 {
+		return "", errors.New("assignment requires nonnegative retries and a positive retry interval")
+	}
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
@@ -99,6 +103,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	// create new cluster wide lock
 	lock := lease.NewKubeLeaseLock(client, kubeipLockName, cfg.LeaseNamespace, node.Instance, cfg.LeaseDuration)
 
+	var lastError error
 	for retryCounter := 0; retryCounter <= cfg.RetryAttempts; retryCounter++ {
 		log.WithFields(logrus.Fields{
 			"node":           node.Name,
@@ -126,6 +131,11 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			return assignedAddress, nil
 		}
 
+		lastError = err
+		if errors.Is(err, errAssignmentComplete) {
+			return "", err
+		}
+
 		log.WithError(err).WithFields(logrus.Fields{
 			"node":     node.Name,
 			"instance": node.Instance,
@@ -143,7 +153,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			return "", errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
 		}
 	}
-	return "", errors.New("reached maximum number of retries")
+	return "", errors.Wrap(lastError, "reached maximum number of retries")
 }
 
 func waitForAddressToBeReported(c context.Context, log *logrus.Entry, explorer nd.Explorer, node *types.Node, assignedAddress string, cfg *config.Config) error {
@@ -246,48 +256,45 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 }
 
 func runNode(ctx context.Context, log *logrus.Entry, clientset kubernetes.Interface, assigner address.Assigner, n *types.Node, cfg *config.Config) error {
+	managed, err := newManagedAssigner(clientset, assigner, n, cfg)
+	if err != nil {
+		return err
+	}
+	metrics := &telemetry.Metrics{}
+	stopMetrics, err := startMetrics(ctx, log, cfg, assigner, metrics)
+	if err != nil {
+		return err
+	}
+	defer stopMetrics()
+	assigner = &observedAssigner{Assigner: managed, metrics: metrics}
 	assignedAddress, err := assignAddress(ctx, log, clientset, assigner, n, cfg)
 	if err != nil {
-		return errors.Wrap(err, "assigning static public IP address")
+		complete, stateErr := managed.finishExhausted(ctx, err)
+		if stateErr != nil {
+			return stateErr
+		}
+		if !complete {
+			return errors.Wrap(err, "assigning static public IP address")
+		}
+		if err := removeCompletionTaint(ctx, clientset, n, cfg.CompletionTaintKey); err != nil {
+			return err
+		}
+		<-ctx.Done()
+		return nil
+	}
+	if err := removeCompletionTaint(ctx, clientset, n, cfg.CompletionTaintKey); err != nil {
+		return err
 	}
 
-	if cfg.TaintKey != "" || cfg.LabelAssignedAddress {
-		if err := waitForAddressToBeReported(ctx, log, nd.NewExplorer(clientset), n, assignedAddress, cfg); err != nil {
-			return errors.Wrap(err, "waiting for node to report assigned address")
-		}
-	}
-	if cfg.LabelAssignedAddress {
-		if assignedAddress == "" {
-			return errors.New("cannot label node with an empty assigned address")
-		}
-		if err := nd.SetAssignedAddress(ctx, clientset, n.Name, assignedAddress); err != nil {
-			return errors.Wrap(err, "setting assignment label")
-		}
+	if err := publishAssignment(ctx, log, clientset, managed, assignedAddress); err != nil {
+		return err
 	}
 
-	if cfg.TaintKey != "" {
-		logger := log.WithField("taint-key", cfg.TaintKey)
-		tainter := nd.NewTainter(clientset)
-
-		didRemoveTaint, err := tainter.RemoveTaintKey(ctx, n, cfg.TaintKey)
-		if err != nil {
-			logger.Error("removing taint key failed, releasing static public IP address")
-			if releaseErr := releaseIP(assigner, n, clientset, cfg.LabelAssignedAddress); releaseErr != nil { //nolint:contextcheck
-				log.WithError(releaseErr).Error("releasing static public IP address after taint key removal failed")
-			}
-			return errors.Wrap(err, "removing node taint key")
-		}
-
-		if didRemoveTaint {
-			logger.Info("taint key removed successfully")
-		} else {
-			logger.Warning("taint key not present on node, skipped removal")
-		}
-	}
-
+	metrics.Ready(true)
 	// pause the agent to prevent it from exiting immediately after assigning the static public IP address
 	// wait for the context to be done: SIGTERM, SIGINT
-	<-ctx.Done()
+	waitWithReconciliation(ctx, log, clientset, managed, metrics)
+	metrics.Ready(false)
 	log.Infof("shutting down kubeip agent")
 
 	// release the static public IP address on exit
@@ -419,6 +426,24 @@ func main() {
 						EnvVars:  []string{"RELEASE_ON_EXIT"},
 						Category: "Configuration",
 						Value:    true,
+					},
+					&cli.StringFlag{
+						Name:     "completion-taint-key",
+						Usage:    "remove a separate taint after assignment succeeds or the address pool is exhausted",
+						EnvVars:  []string{"COMPLETION_TAINT_KEY"},
+						Category: "Configuration",
+					},
+					&cli.DurationFlag{
+						Name:     "reconcile-interval",
+						Usage:    "GCP drift repair interval (zero disables)",
+						EnvVars:  []string{"RECONCILE_INTERVAL"},
+						Category: "Configuration",
+					},
+					&cli.StringFlag{
+						Name:     "metrics-address",
+						Usage:    "listen address for metrics and health endpoints (empty disables)",
+						EnvVars:  []string{"METRICS_ADDRESS"},
+						Category: "Configuration",
 					},
 					&cli.StringFlag{
 						Name:     "aws-ipam-pool-id",

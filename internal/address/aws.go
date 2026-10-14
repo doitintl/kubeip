@@ -304,7 +304,7 @@ func (a *awsAssigner) getAvailableElasticIPs(ctx context.Context, filter []strin
 		return nil, errors.Wrap(err, "failed to list available elastic IPs")
 	}
 	if len(addresses) == 0 {
-		return nil, errors.Errorf("no available elastic IPs")
+		return nil, ErrNoAvailableAddresses
 	}
 	// sort addresses by orderBy field
 	sortAddressesByField(addresses, orderBy)

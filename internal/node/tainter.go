@@ -63,7 +63,7 @@ func (t *tainter) RemoveTaintKey(ctx context.Context, node *types.Node, taintKey
 	}
 
 	// Patch the node with only the remaining taints
-	patch := fmt.Sprintf(`{"spec":{"taints":%v}}`, string(newTaintsMarshaled))
+	patch := fmt.Sprintf(`{"metadata":{"uid":%q,"resourceVersion":%q},"spec":{"taints":%v}}`, n.UID, n.ResourceVersion, string(newTaintsMarshaled))
 	_, err = t.client.CoreV1().Nodes().Patch(ctx, node.Name, typesv1.MergePatchType, []byte(patch), metav1.PatchOptions{})
 	if err != nil {
 		return false, errors.Wrap(err, "failed to patch node taints")

@@ -13,31 +13,32 @@ import (
 // IPAMAllocationAnnotation records an allocation intent before the cloud request.
 const IPAMAllocationAnnotation = "kubeip.com/ipam-allocation"
 
-type IPAMState struct {
+type AnnotationState struct {
 	client   kubernetes.Interface
 	nodeName string
+	key      string
 }
 
-func NewIPAMState(client kubernetes.Interface, nodeName string) *IPAMState {
-	return &IPAMState{client: client, nodeName: nodeName}
+func NewIPAMState(client kubernetes.Interface, nodeName string) *AnnotationState {
+	return &AnnotationState{client: client, nodeName: nodeName, key: IPAMAllocationAnnotation}
 }
 
-func (s *IPAMState) Load(ctx context.Context) (string, error) {
+func (s *AnnotationState) Load(ctx context.Context) (string, error) {
 	n, err := s.client.CoreV1().Nodes().Get(ctx, s.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return "", errors.Wrap(err, "reading IPAM allocation intent")
+		return "", errors.Wrap(err, "reading assignment state")
 	}
-	return n.Annotations[IPAMAllocationAnnotation], nil
+	return n.Annotations[s.key], nil
 }
 
 // CompareAndSwap prevents two agents from issuing the same non-idempotent allocation.
-func (s *IPAMState) CompareAndSwap(ctx context.Context, oldValue, newValue string) error {
+func (s *AnnotationState) CompareAndSwap(ctx context.Context, oldValue, newValue string) error {
 	n, err := s.client.CoreV1().Nodes().Get(ctx, s.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "reading IPAM allocation intent")
+		return errors.Wrap(err, "reading assignment state")
 	}
-	if n.Annotations[IPAMAllocationAnnotation] != oldValue {
-		return errors.New("IPAM allocation intent changed")
+	if n.Annotations[s.key] != oldValue {
+		return errors.New("assignment state changed")
 	}
 	var value *string
 	if newValue != "" {
@@ -45,11 +46,18 @@ func (s *IPAMState) CompareAndSwap(ctx context.Context, oldValue, newValue strin
 	}
 	patch, err := json.Marshal(map[string]any{"metadata": map[string]any{
 		"uid": n.UID, "resourceVersion": n.ResourceVersion,
-		"annotations": map[string]*string{IPAMAllocationAnnotation: value},
+		"annotations": map[string]*string{s.key: value},
 	}})
 	if err != nil {
-		return errors.Wrap(err, "encoding IPAM allocation intent")
+		return errors.Wrap(err, "encoding assignment state")
 	}
 	_, err = s.client.CoreV1().Nodes().Patch(ctx, s.nodeName, typesv1.MergePatchType, patch, metav1.PatchOptions{})
-	return errors.Wrap(err, "saving IPAM allocation intent")
+	return errors.Wrap(err, "saving assignment state")
+}
+
+// AssignmentStateAnnotation persists drift targets and terminal completion results.
+const AssignmentStateAnnotation = "kubeip.com/assignment-state"
+
+func NewAssignmentState(client kubernetes.Interface, nodeName string) *AnnotationState {
+	return &AnnotationState{client: client, nodeName: nodeName, key: AssignmentStateAnnotation}
 }
