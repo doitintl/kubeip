@@ -1,8 +1,8 @@
 # Assignment lifecycle and validation
 
-Use disposable nodes and reserved public IPv4 addresses for validation. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The candidate chart and examples include this permission.
+Use disposable nodes and reserved public IPv4 addresses for validation. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The chart and examples include this permission.
 
-Use an image built from this candidate branch, not 2.3.0. Set `AWS_IPAM_POOL_ID=""` throughout GCP validation. The AWS IPAM runbook is separate.
+Use agent 2.4.0 or later. Set `AWS_IPAM_POOL_ID=""` throughout GCP validation. The AWS IPAM runbook is separate.
 
 ## Baseline and assignment label (#126)
 
@@ -38,8 +38,8 @@ Test a pool with more disposable nodes than addresses. Successful nodes should l
 
 Before changing modes, resetting terminal state or intentionally choosing a new address, drain the node, stop its agent, restore the appropriate template taints, and remove only `kubeip.com/assignment-state` after inspecting it. Restart and verify the result before uncordoning. Do not automate blind state resets.
 
-Set `terminationGracePeriodSeconds` to at least 330 when release-on-exit is enabled. The agent allows five minutes for release; a 30-second grace period can interrupt restoration of an ephemeral IP. The candidate chart and examples use 330 seconds.
+Set `terminationGracePeriodSeconds` to at least 330 when release-on-exit is enabled. The agent allows five minutes for release; a 30-second grace period can interrupt restoration of an ephemeral IP. The chart and examples use 330 seconds.
 
 ## Acceptance and rollback
 
-Record candidate image digest, configuration, Node UID, addresses, cloud operation IDs and observed results. Rollback means stopping the candidate, inspecting its persisted state and owned reservations, restoring a known configuration and verifying Node readiness before admitting workloads. Retained reservations are intentional in persistent modes and require explicit cleanup after disposable nodes are removed.
+Record image digest, configuration, Node UID, addresses, cloud operation IDs and observed results. Rollback means stopping the agent, inspecting its persisted state and owned reservations, restoring a known configuration and verifying Node readiness before admitting workloads. Retained reservations are intentional in persistent modes and require explicit cleanup after disposable nodes are removed.

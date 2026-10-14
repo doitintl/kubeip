@@ -1,6 +1,6 @@
 # AWS VPC IPAM
 
-AWS IPAM uses AWS VPC IPAM public IPv4 pools. This feature is not in agent 2.3.0. Use an image built from the candidate branch.
+AWS IPAM uses AWS VPC IPAM public IPv4 pools. This feature requires agent 2.4.0 or later.
 
 Set `AWS_IPAM_POOL_ID=ipam-pool-...` to allocate an Elastic IP from an existing public IPv4 IPAM pool. Leave it empty to retain the existing preallocated-address behavior. IPAM mode requires AWS, IPv4, empty `FILTER` and `ORDER_BY`, and Kubernetes Node `get` and `patch` permission. The target must have a primary network interface. IPAM recovery also supports an interface without a public IPv4 address, for example after release on an EKS node with multiple interfaces. The pod needs an independent path to EC2 and Kubernetes APIs during release and recovery, such as an EC2 interface VPC endpoint with private DNS and the private EKS endpoint. Image pulls and credential retrieval also need connectivity if the node has no public address. With EKS Pod Identity, provide the `com.amazonaws.<region>.eks-auth` interface endpoint as well as the EC2 endpoint. Cache or privately host the image, or provide independent outbound access. KubeIP does not provision the IPAM pool.
 
@@ -22,7 +22,7 @@ To recover unresolved intent, stop the agent on the affected node, check EC2/Clo
 
 Select a disposable AWS account, region, cluster, node group and IPAM pool before running this acceptance checklist.
 
-1. Confirm candidate image, role permissions, empty filters, Node patch permission, and unused pool capacity. Record existing unrelated EIPs.
+1. Confirm the agent image, role permissions, empty filters, Node patch permission, and unused pool capacity. Record existing unrelated EIPs.
 2. Start one disposable node. Verify one allocation from the selected pool, both ownership tags, the Node intent, and primary-interface association.
 3. With release disabled, restart the pod repeatedly. Allocation ID and public address must remain unchanged.
 4. Deny association after allocation. Retry and restart. Exactly one reserved allocation must remain, and retries must use it. Restore permission and confirm assignment.

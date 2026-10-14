@@ -222,8 +222,7 @@ writing `0-0-0-0`, so an `Exists` selector does not match a released address.
 Label removal does not evict running pods, and the label is not a continuous
 cloud-health check.
 
-This feature requires an agent build containing `--label-assigned-address`; it is
-not included in agent 2.3.0. In a chart version supporting this setting, enable
+This feature requires agent 2.4.0 or later. With chart 0.3.0 or later, enable
 `daemonSet.env.LABEL_ASSIGNED_ADDRESS` and `rbac.allowNodesPatchPermission`, and
 select a compatible agent image.
 
@@ -503,16 +502,16 @@ helm upgrade --install kubeip kubeip/kubeip \
 
 See the [chart documentation](chart/README.md) for configuration and version pinning.
 
-### AWS VPC IPAM (unreleased)
+### AWS VPC IPAM
 
-Set `AWS_IPAM_POOL_ID` to allocate an Elastic IP from an existing AWS public IPv4 IPAM pool. The default is empty, preserving preallocated-address behavior. Clear `FILTER` and `ORDER_BY`, enable Node patch permission, and use a compatible candidate image. This option is not available in 2.3.0 and must remain empty for GCP.
+Set `AWS_IPAM_POOL_ID` to allocate an Elastic IP from an existing AWS public IPv4 IPAM pool. The default is empty, preserving preallocated-address behavior. Clear `FILTER` and `ORDER_BY`, enable Node patch permission, and use agent 2.4.0 or later. This option must remain empty for GCP.
 
 Allocations are tagged and recovered across restarts. Failed association retains the reservation for retry; unresolved allocation outcomes stop further allocation until recovery. Normal shutdown with `RELEASE_ON_EXIT=true` releases the owned allocation back to the pool. See the [AWS IPAM guide](docs/aws-ipam.md) for permissions, recovery, costs from retained reservations and the separate AWS validation matrix.
 
-### Metrics and persistent assignment modes (unreleased)
+### Metrics and persistent assignment modes
 
 `METRICS_ADDRESS=:8080` enables Prometheus metrics, `/healthz`, and `/readyz`. It is disabled by default. Inventory supports GCP and AWS and reports existing reservations matching the configured filter. Each pod reports the same pool, so deduplicate replicas instead of summing them. Failed refreshes retain the old counts with an unhealthy flag and the last-success timestamp.
 
 `RECONCILE_INTERVAL=30s` enables GCP repair of a persisted reservation after address drift. `COMPLETION_TAINT_KEY` instead removes a separate taint after successful assignment or confirmed pool exhaustion, with terminal state surviving restarts. Both modes default off, require `RELEASE_ON_EXIT=false` and Node patch permission, and cannot be combined. Completion mode also cannot be combined with IPAM. Uncertain cloud failures keep the completion taint.
 
-These features are not in 2.3.0. See the [assignment lifecycle guide](docs/lifecycle.md) for configuration, limitations, failure tests and safe state resets. See [v1 label migration](docs/v1-migration.md) if a node loses its DaemonSet selector label.
+These features require agent 2.4.0 or later. See the [assignment lifecycle guide](docs/lifecycle.md) for configuration, limitations, failure tests and safe state resets. See [v1 label migration](docs/v1-migration.md) if a node loses its DaemonSet selector label.
