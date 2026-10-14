@@ -2,6 +2,7 @@ package address
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -547,7 +548,9 @@ func Test_awsAssigner_Assign(t *testing.T) {
 				address: "100.0.0.1",
 				logger:  logrus.NewEntry(logrus.New()),
 				instanceGetterFn: func(t *testing.T, args *args) cloud.Ec2InstanceGetter {
-					return nil
+					mock := mocks.NewEc2InstanceGetter(t)
+					mock.EXPECT().Get(args.ctx, args.instanceID, "us-east-1").Return(&types.Instance{PublicIpAddress: aws.String("100.0.0.1")}, nil)
+					return mock
 				},
 				eipAssignerFn: func(t *testing.T, args *args) cloud.EipAssigner {
 					return nil
@@ -986,9 +989,12 @@ func Test_awsAssigner_getAssignedElasticIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			getter := mocks.NewEc2InstanceGetter(t)
+			getter.EXPECT().Get(context.TODO(), tt.args.instanceID, "us-east-1").Return(&types.Instance{PublicIpAddress: aws.String("100.0.0.1")}, nil).Maybe()
 			a := &awsAssigner{
-				region:    tt.fields.region,
-				eipLister: tt.fields.eipListerFn(t, &tt.args),
+				instanceGetter: getter,
+				region:         tt.fields.region,
+				eipLister:      tt.fields.eipListerFn(t, &tt.args),
 			}
 			got, err := a.getAssignedElasticIP(context.TODO(), tt.args.instanceID)
 			if (err != nil) != tt.wantErr {
@@ -1047,14 +1053,41 @@ func Test_awsAssigner_Unassign(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			getter := mocks.NewEc2InstanceGetter(t)
+			getter.EXPECT().Get(context.TODO(), tt.args.instanceID, "us-east-1").Return(&types.Instance{PublicIpAddress: aws.String("100.0.0.1")}, nil).Maybe()
 			a := &awsAssigner{
-				region:      tt.fields.region,
-				logger:      logrus.NewEntry(logrus.New()),
-				eipLister:   tt.fields.eipListerFn(t, &tt.args),
-				eipAssigner: tt.fields.eipAssignerFn(t, &tt.args),
+				instanceGetter: getter,
+				region:         tt.fields.region,
+				logger:         logrus.NewEntry(logrus.New()),
+				eipLister:      tt.fields.eipListerFn(t, &tt.args),
+				eipAssigner:    tt.fields.eipAssignerFn(t, &tt.args),
 			}
 			if err := a.Unassign(context.TODO(), tt.args.instanceID, ""); (err != nil) != tt.wantErr {
 				t.Errorf("Unassign() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_getAssignedElasticIPUsesPrimaryAddress(t *testing.T) {
+	for _, primaryReserved := range []bool{false, true} {
+		t.Run(fmt.Sprint(primaryReserved), func(t *testing.T) {
+			getter := mocks.NewEc2InstanceGetter(t)
+			getter.EXPECT().Get(context.Background(), "instance", "region").Return(&types.Instance{PublicIpAddress: aws.String("1.1.1.1")}, nil)
+			lister := mocks.NewEipLister(t)
+			addresses := []types.Address{{PublicIp: aws.String("2.2.2.2")}}
+			if primaryReserved {
+				addresses = append(addresses, types.Address{PublicIp: aws.String("1.1.1.1")})
+			}
+			lister.EXPECT().List(context.Background(), map[string][]string{"instance-id": {"instance"}}, true).Return(addresses, nil)
+			a := &awsAssigner{region: "region", instanceGetter: getter, eipLister: lister}
+			got, err := a.getAssignedElasticIP(context.Background(), "instance")
+			if primaryReserved {
+				if err != nil || got == nil || *got.PublicIp != "1.1.1.1" {
+					t.Fatalf("address=%v err=%v", got, err)
+				}
+			} else if !errors.Is(err, ErrNoStaticIPAssigned) || got != nil {
+				t.Fatalf("secondary address accepted: address=%v err=%v", got, err)
 			}
 		})
 	}

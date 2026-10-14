@@ -2,6 +2,7 @@ package address
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -436,7 +437,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 							{
 								Name: "test-network-interface",
 								AccessConfigs: []*compute.AccessConfig{
-									{Name: "test-access-config", NatIP: "200.0.0.1", Type: defaultAccessConfigType, Kind: accessConfigKind},
+									{Name: "test-access-config", NatIP: "100.0.0.2", Type: defaultAccessConfigType, Kind: accessConfigKind},
 								},
 								Fingerprint: "test-fingerprint",
 							},
@@ -488,6 +489,17 @@ func Test_createAccessConfig(t *testing.T) {
 		args args
 		want *compute.AccessConfig
 	}{
+		{
+			name: "restore IPv4 ephemeral address using project default tier",
+			args: args{address: nil},
+			want: &compute.AccessConfig{Name: defaultNetworkName, Type: defaultAccessConfigType, Kind: accessConfigKind},
+		},
+		{
+			name: "reserved IPv4 PREMIUM tier",
+			args: args{address: &compute.Address{Address: "1.1.1.1", NetworkTier: "PREMIUM"}},
+			want: &compute.AccessConfig{Name: defaultNetworkName, Type: defaultAccessConfigType, Kind: accessConfigKind, NatIP: "1.1.1.1", NetworkTier: "PREMIUM"},
+		},
+
 		{
 			name: "create access config for IPv4 address",
 			args: args{
@@ -898,5 +910,43 @@ func Test_AddInstanceAddressRequiresCompletedOperation(t *testing.T) {
 				t.Fatalf("error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func Test_checkStaticIPAssignedUsesManagedInterface(t *testing.T) {
+	for _, ipv6 := range []bool{false, true} {
+		for _, primaryReserved := range []bool{false, true} {
+			t.Run(fmt.Sprintf("ipv6=%v/primaryReserved=%v", ipv6, primaryReserved), func(t *testing.T) {
+				primaryIP, secondaryIP := "1.1.1.1", "2.2.2.2"
+				ipFilter := "(ipVersion!=IPV6)"
+				if ipv6 {
+					primaryIP, secondaryIP, ipFilter = "2001:db8::1", "2001:db8::2", "(ipVersion=IPV6)"
+				}
+				instance := &compute.Instance{SelfLink: "self", NetworkInterfaces: []*compute.NetworkInterface{
+					{AccessConfigs: []*compute.AccessConfig{{NatIP: primaryIP}}, Ipv6AccessConfigs: []*compute.AccessConfig{{ExternalIpv6: primaryIP}}},
+					{AccessConfigs: []*compute.AccessConfig{{NatIP: secondaryIP}}, Ipv6AccessConfigs: []*compute.AccessConfig{{ExternalIpv6: secondaryIP}}},
+				}}
+				getter := mocks.NewInstanceGetter(t)
+				getter.EXPECT().Get("project", "zone", "instance").Return(instance, nil)
+				lister := mocks.NewLister(t)
+				call := mocks.NewListCall(t)
+				lister.EXPECT().List("project", "region").Return(call)
+				call.EXPECT().Filter("(status=IN_USE) (addressType=EXTERNAL) " + ipFilter).Return(call)
+				addresses := []*compute.Address{{Address: secondaryIP, Users: []string{"self"}}}
+				if primaryReserved {
+					addresses = append(addresses, &compute.Address{Address: primaryIP, Users: []string{"self"}})
+				}
+				call.EXPECT().Do().Return(&compute.AddressList{Items: addresses}, nil)
+				a := &gcpAssigner{project: "project", region: "region", ipv6: ipv6, instanceGetter: getter, lister: lister}
+				gotInstance, ip, err := a.checkStaticIPAssigned("zone", "instance")
+				if primaryReserved {
+					if !errors.Is(err, ErrStaticIPAlreadyAssigned) || ip != primaryIP {
+						t.Fatalf("ip=%q err=%v", ip, err)
+					}
+				} else if err != nil || ip != "" || gotInstance != instance {
+					t.Fatalf("secondary address accepted: ip=%q err=%v", ip, err)
+				}
+			})
+		}
 	}
 }

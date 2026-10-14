@@ -278,11 +278,31 @@ func (a *gcpAssigner) checkStaticIPAssigned(zone, instanceID string) (*compute.I
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to list assigned addresses")
 	}
-	// create a map of users for quick lookup
-	users := a.createUserMap(assigned)
-	// check if the instance's self link is in the list of users
-	if address, ok := users[instance.SelfLink]; ok {
-		return nil, address, ErrStaticIPAlreadyAssigned
+	networkInterface, err := getNetworkInterface(instance)
+	if err != nil {
+		return nil, "", err
+	}
+	accessConfig, err := getAccessConfig(networkInterface, a.ipv6)
+	if errors.Is(err, ErrNoPublicIPAssigned) {
+		return instance, "", nil
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	currentIP := accessConfig.NatIP
+	if a.ipv6 {
+		currentIP = accessConfig.ExternalIpv6
+	}
+	// Verify the actual managed interface, not an address attached elsewhere on the instance.
+	for _, address := range assigned {
+		if address.Address != currentIP {
+			continue
+		}
+		for _, user := range address.Users {
+			if user == instance.SelfLink {
+				return nil, currentIP, ErrStaticIPAlreadyAssigned
+			}
+		}
 	}
 	return instance, "", nil
 }
@@ -437,7 +457,9 @@ func createAccessConfig(address *compute.Address, ipv6 bool) *compute.AccessConf
 		accessConfig.ExternalIpv6PrefixLength = addressPrefixLengthOrDefault(address)
 	} else {
 		accessConfig.NatIP = addressAddressOrEmpty(address)
-		accessConfig.NetworkTier = addressNetworkTierOrDefault(address)
+		if address != nil {
+			accessConfig.NetworkTier = address.NetworkTier
+		}
 	}
 
 	return accessConfig

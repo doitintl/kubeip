@@ -268,7 +268,17 @@ func (a *awsAssigner) getAssignedElasticIP(ctx context.Context, instanceID strin
 	if len(addresses) == 0 {
 		return nil, ErrNoStaticIPAssigned
 	}
-	return &addresses[0], nil
+	instance, err := a.instanceGetter.Get(ctx, instanceID, a.region)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to verify assigned elastic IP")
+	}
+	// The instance public address is the primary interface's primary public IPv4 address.
+	for i := range addresses {
+		if instance.PublicIpAddress != nil && addresses[i].PublicIp != nil && *addresses[i].PublicIp == *instance.PublicIpAddress {
+			return &addresses[i], nil
+		}
+	}
+	return nil, ErrNoStaticIPAssigned
 }
 
 func (a *awsAssigner) getAvailableElasticIPs(ctx context.Context, filter []string, orderBy string) ([]types.Address, error) {
