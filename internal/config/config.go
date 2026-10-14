@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	// WaitForNodeAddress waits for Node status before removing the assignment taint.
+	WaitForNodeAddress bool `json:"wait-for-node-address"`
 	// KubeConfigPath is the path to the kubeconfig file
 	KubeConfigPath string `json:"kubeconfig"`
 	// NodeName is the name of the Kubernetes node
@@ -39,6 +41,7 @@ type Config struct {
 
 func NewConfig(c *cli.Context) *Config {
 	var cfg Config
+	cfg.WaitForNodeAddress = c.Bool("wait-for-node-address")
 	cfg.KubeConfigPath = c.String("kubeconfig")
 	cfg.NodeName = c.String("node-name")
 	cfg.DevelopMode = c.Bool("develop-mode")

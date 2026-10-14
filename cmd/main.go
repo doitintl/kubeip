@@ -124,6 +124,9 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 			"node":     node.Name,
 			"instance": node.Instance,
 		}).Error("failed to assign static public IP address to node")
+		if retryCounter == cfg.RetryAttempts {
+			break
+		}
 		log.Infof("retrying after %v", cfg.RetryInterval)
 
 		select {
@@ -138,6 +141,9 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 }
 
 func waitForAddressToBeReported(c context.Context, log *logrus.Entry, explorer nd.Explorer, node *types.Node, assignedAddress string, cfg *config.Config) error {
+	if !cfg.WaitForNodeAddress {
+		return nil
+	}
 	ctx, cancel := context.WithCancel(c)
 	defer cancel()
 
@@ -181,6 +187,9 @@ func waitForAddressToBeReported(c context.Context, log *logrus.Entry, explorer n
 			}).Error("failed to check if node is reporting the assigned address")
 		}
 
+		if retryCounter == cfg.RetryAttempts {
+			break
+		}
 		log.Infof("retrying after %v", cfg.RetryInterval)
 
 		select {
@@ -384,6 +393,13 @@ func main() {
 						EnvVars:  []string{"RELEASE_ON_EXIT"},
 						Category: "Configuration",
 						Value:    true,
+					},
+					&cli.BoolFlag{
+						Name:     "wait-for-node-address",
+						Usage:    "wait for Node status to report the assigned address before removing the taint",
+						EnvVars:  []string{"WAIT_FOR_NODE_ADDRESS"},
+						Value:    true,
+						Category: "Configuration",
 					},
 					&cli.StringFlag{
 						Name:     "taint-key",

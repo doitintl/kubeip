@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -223,11 +224,12 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 					Zone:     "test-zone",
 				},
 				cfg: &config.Config{
-					Filter:        []string{"test-filter"},
-					OrderBy:       "test-order-by",
-					RetryAttempts: 3,
-					RetryInterval: time.Millisecond,
-					LeaseDuration: 1,
+					WaitForNodeAddress: true,
+					Filter:             []string{"test-filter"},
+					OrderBy:            "test-order-by",
+					RetryAttempts:      3,
+					RetryInterval:      time.Millisecond,
+					LeaseDuration:      1,
 				},
 			},
 		},
@@ -261,11 +263,12 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 					Zone:     "test-zone",
 				},
 				cfg: &config.Config{
-					Filter:        []string{"test-filter"},
-					OrderBy:       "test-order-by",
-					RetryAttempts: 3,
-					RetryInterval: time.Millisecond,
-					LeaseDuration: 1,
+					WaitForNodeAddress: true,
+					Filter:             []string{"test-filter"},
+					OrderBy:            "test-order-by",
+					RetryAttempts:      3,
+					RetryInterval:      time.Millisecond,
+					LeaseDuration:      1,
 				},
 			},
 		},
@@ -298,11 +301,12 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 					Zone:     "test-zone",
 				},
 				cfg: &config.Config{
-					Filter:        []string{"test-filter"},
-					OrderBy:       "test-order-by",
-					RetryAttempts: 3,
-					RetryInterval: time.Millisecond,
-					LeaseDuration: 1,
+					WaitForNodeAddress: true,
+					Filter:             []string{"test-filter"},
+					OrderBy:            "test-order-by",
+					RetryAttempts:      3,
+					RetryInterval:      time.Millisecond,
+					LeaseDuration:      1,
 				},
 			},
 			wantErr: true,
@@ -331,11 +335,12 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 					Zone:     "test-zone",
 				},
 				cfg: &config.Config{
-					Filter:        []string{"test-filter"},
-					OrderBy:       "test-order-by",
-					RetryAttempts: 10,
-					RetryInterval: 5 * time.Millisecond,
-					LeaseDuration: 1,
+					WaitForNodeAddress: true,
+					Filter:             []string{"test-filter"},
+					OrderBy:            "test-order-by",
+					RetryAttempts:      10,
+					RetryInterval:      5 * time.Millisecond,
+					LeaseDuration:      1,
 				},
 			},
 			wantErr: true,
@@ -359,11 +364,12 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 					Zone:     "test-zone",
 				},
 				cfg: &config.Config{
-					Filter:        []string{"test-filter"},
-					OrderBy:       "test-order-by",
-					RetryAttempts: 3,
-					RetryInterval: 15 * time.Millisecond,
-					LeaseDuration: 1,
+					WaitForNodeAddress: true,
+					Filter:             []string{"test-filter"},
+					OrderBy:            "test-order-by",
+					RetryAttempts:      3,
+					RetryInterval:      15 * time.Millisecond,
+					LeaseDuration:      1,
 				},
 			},
 			wantErr: true,
@@ -376,6 +382,39 @@ func Test_waitForAddressToBeReported(t *testing.T) {
 			err := waitForAddressToBeReported(tt.args.c, log, explorer, tt.args.node, tt.args.address, tt.args.cfg)
 			if err != nil != tt.wantErr {
 				t.Errorf("waitForAddressToBeReported() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_waitForAddressDisabled(t *testing.T) {
+	// No explorer is needed when the cloud assignment is enough.
+	err := waitForAddressToBeReported(context.Background(), prepareLogger("error", false), nil, nil, "1.1.1.1", &config.Config{WaitForNodeAddress: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_finalAttemptDoesNotWait(t *testing.T) {
+	for _, assignment := range []bool{false, true} {
+		t.Run(fmt.Sprint(assignment), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			cfg := &config.Config{WaitForNodeAddress: true, RetryAttempts: 0, RetryInterval: time.Hour, LeaseDuration: 5}
+			n := &types.Node{Name: "test-node", Instance: "instance", Zone: "zone"}
+			log := prepareLogger("error", false)
+			var err error
+			if assignment {
+				assigner := mocks.NewAssigner(t)
+				assigner.EXPECT().Assign(tmock.Anything, "instance", "zone", []string(nil), "").Return("", errors.New("no addresses")).Once()
+				_, err = assignAddress(ctx, log, fake.NewSimpleClientset(), assigner, n, cfg)
+			} else {
+				explorer := nodeMocks.NewExplorer(t)
+				explorer.EXPECT().GetNode(tmock.Anything, n.Name).Return(&types.Node{}, nil).Once()
+				err = waitForAddressToBeReported(ctx, log, explorer, n, "1.1.1.1", cfg)
+			}
+			if err == nil || err.Error() != "reached maximum number of retries" {
+				t.Fatalf("expected exhausted retries without waiting, got %v", err)
 			}
 		})
 	}

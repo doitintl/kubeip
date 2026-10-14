@@ -137,7 +137,7 @@ where the workload must call resources with IP-whitelisting, to prevent race con
 nodes.
 
 To enable this feature, set the `taint-key` configuration parameter (See [How to run KubeIP](#how-to-run-kubeip)) to the taint key that
-should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes. For example,
+should be removed. Then add a toleration to the KubeIP DaemonSet, so that it itself can be scheduled on the tainted nodes.
 Configure the taint on the node pool so replacement and autoscaled nodes inherit it.
 The startup-taint prefix lets Cluster Autoscaler account for nodes that are still initializing. For example,
 given that new nodes are created with a taint key of `startup-taint.cluster-autoscaler.kubernetes.io/kubeip-not-ready`:
@@ -171,6 +171,12 @@ spec:
                 - ALL
             readOnlyRootFilesystem: true
 ```
+
+By default, KubeIP waits until Node status reports the assigned address before removing the taint.
+For workloads that only need the address for egress, set `WAIT_FOR_NODE_ADDRESS=false` (or
+`--wait-for-node-address=false`) to remove the taint after cloud assignment succeeds. Keep the default
+if workloads depend on the Node's advertised external address. In Helm, set
+`daemonSet.env.WAIT_FOR_NODE_ADDRESS=false`.
 
 The parameter has no default value, and if not set, KubeIP will not attempt to remove any taints. If the provided Taint Key is not present
 on the node, KubeIP will simply log this fact and continue normally without attempting to remove it. If the Taint Key is present, but
@@ -379,6 +385,7 @@ OPTIONS:
    --project value                    name of the GCP project or the AWS account ID (not needed if running in node) or OCI compartment OCID (required for OCI) [$PROJECT]
    --region value                     name of the GCP region or the AWS region or the OCI region (not needed if running in node) [$REGION]
    --release-on-exit                  release the static public IP address on exit (default: true) [$RELEASE_ON_EXIT]
+   --wait-for-node-address            wait for Node status before removing the taint (default: true) [$WAIT_FOR_NODE_ADDRESS]
    --taint-key value                  specify a taint key to remove from the node once the static public IP address is assigned [$TAINT_KEY]
    --retry-attempts value             number of attempts to assign the static public IP address (default: 10) [$RETRY_ATTEMPTS]
    --retry-interval value             when the agent fails to assign the static public IP address, it will retry after this interval (default: 5m0s) [$RETRY_INTERVAL]
