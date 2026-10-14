@@ -13,8 +13,8 @@ func TestEmptyFilterEnvironmentForIPAM(t *testing.T) {
 		want        []string
 	}{
 		{name: "empty Helm environment", value: "", want: nil},
-		{name: "blank entries", value: " ; labels.pool=lab; ", want: []string{"labels.pool=lab"}},
-		{name: "AWS values retain commas", value: "Name=tag:kubeip,Values=reserved,public;Name=tag:env,Values=lab", want: []string{"Name=tag:kubeip,Values=reserved,public", "Name=tag:env,Values=lab"}},
+		{name: "blank entries", value: " ; labels.pool=test; ", want: []string{"labels.pool=test"}},
+		{name: "AWS values retain commas", value: "Name=tag:kubeip,Values=reserved,public;Name=tag:env,Values=test", want: []string{"Name=tag:kubeip,Values=reserved,public", "Name=tag:env,Values=test"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("FILTER", tc.value)

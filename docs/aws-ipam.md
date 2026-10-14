@@ -1,10 +1,10 @@
-# AWS VPC IPAM lab candidate
+# AWS VPC IPAM
 
-Issue #166 uses AWS VPC IPAM public IPv4 pools. It is excluded from the first GCP pass in `thorson-lab1-sharedvpc`. This feature is not in agent 2.3.0. Use an image built from the candidate branch.
+AWS IPAM uses AWS VPC IPAM public IPv4 pools. This feature is not in agent 2.3.0. Use an image built from the candidate branch.
 
 Set `AWS_IPAM_POOL_ID=ipam-pool-...` to allocate an Elastic IP from an existing public IPv4 IPAM pool. Leave it empty to retain the existing preallocated-address behavior. IPAM mode requires AWS, IPv4, empty `FILTER` and `ORDER_BY`, and Kubernetes Node `get` and `patch` permission. The target must have a primary network interface. IPAM recovery also supports an interface without a public IPv4 address, for example after release on an EKS node with multiple interfaces. The pod needs an independent path to EC2 and Kubernetes APIs during release and recovery, such as an EC2 interface VPC endpoint with private DNS and the private EKS endpoint. Image pulls and credential retrieval also need connectivity if the node has no public address. With EKS Pod Identity, provide the `com.amazonaws.<region>.eks-auth` interface endpoint as well as the EC2 endpoint. Cache or privately host the image, or provide independent outbound access. KubeIP does not provision the IPAM pool.
 
-The pool must have a public IPv4 CIDR provisioned, support EC2 allocations, and match the target region/network border group. AWS describes these requirements in [Allocate sequential Elastic IP addresses from an IPAM pool](https://docs.aws.amazon.com/vpc/latest/ipam/tutorials-eip-pool.html). The existing AWS identity also needs `ec2:AllocateAddress`, `ec2:AllocateIpamPoolCidr` on the pool, `ec2:CreateTags` during allocation, and `ec2:ReleaseAddress`, in addition to the existing describe, associate and disassociate permissions. Restrict allocation to the lab pool and release/association to resources carrying the ownership tags. Use the pool ARN returned by AWS; IPAM pool ARNs omit the region (`arn:aws:ec2::<account>:ipam-pool/<pool-id>`). Verify the complete policy with the lab account before deployment.
+The pool must have a public IPv4 CIDR provisioned, support EC2 allocations, and match the target region/network border group. AWS describes these requirements in [Allocate sequential Elastic IP addresses from an IPAM pool](https://docs.aws.amazon.com/vpc/latest/ipam/tutorials-eip-pool.html). The existing AWS identity also needs `ec2:AllocateAddress`, `ec2:AllocateIpamPoolCidr` on the pool, `ec2:CreateTags` during allocation, and `ec2:ReleaseAddress`, in addition to the existing describe, associate and disassociate permissions. Restrict allocation to the configured pool and release/association to resources carrying the ownership tags. Use the pool ARN returned by AWS; IPAM pool ARNs omit the region (`arn:aws:ec2::<account>:ipam-pool/<pool-id>`). Verify the complete policy with your AWS account before deployment.
 
 ## Ownership and recovery
 
@@ -30,6 +30,6 @@ Select a disposable AWS account, region, cluster, node group and IPAM pool befor
 6. Deny allocation or exhaust pool capacity. Confirm no workload-ready marker is published. Inspect and reset intent manually after correcting the problem.
 7. Attach an unrelated EIP to the primary interface, or move the owned address elsewhere. Confirm the agent refuses reassociation and release of unrelated addresses.
 8. Enable release and stop the pod normally. Confirm disassociation, release to the pool, and intent removal. Repeat with denied release and confirm intent persists until recovery.
-9. Verify unrelated EIPs, node labels and annotations remain unchanged. Remove only the lab's owned resources after verifying IDs and ownership.
+9. Verify unrelated EIPs, node labels and annotations remain unchanged. Remove only resources created for the test after verifying IDs and ownership.
 
 Unit tests cover allocation request tags, disabled SDK retries, restart reuse, delayed discovery after a lost response, retained allocation after association failure, ownership refusal, state/configuration errors, release failure, and Node patch preconditions.

@@ -1,12 +1,12 @@
-# GCP lab validation
+# Assignment lifecycle and validation
 
-Target project: `thorson-lab1-sharedvpc`. The October 14, 2026 disposable GKE run and its findings are recorded in [live lab results](gcp-2026-10-14.md). Use disposable nodes and reserved public IPv4 addresses for future runs. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The candidate chart and examples include this permission.
+Use disposable nodes and reserved public IPv4 addresses for validation. Confirm the Kubernetes role permits Lease `update` as well as `get`, `create` and `delete`, because renewal is required during longer cloud operations. The candidate chart and examples include this permission.
 
 Use an image built from this candidate branch, not 2.3.0. Set `AWS_IPAM_POOL_ID=""` throughout GCP validation. The AWS IPAM runbook is separate.
 
 ## Baseline and assignment label (#126)
 
-Record Node UID, provider ID, labels, taints, existing public address and reservation ownership. Set node-pool template labels so replacement Nodes inherit the DaemonSet selector. Enable `LABEL_ASSIGNED_ADDRESS=true` and Node patch permission. Assign a reserved address and verify the legacy `kubip_assigned` label has dashed IPv4, only after configured Node-address readiness checks. Test release, restart and a denied Node patch. Unrelated labels and annotations must remain unchanged. See [v1 migration](v1-labels.md) for #154.
+Record Node UID, provider ID, labels, taints, existing public address and reservation ownership. Set node-pool template labels so replacement Nodes inherit the DaemonSet selector. Enable `LABEL_ASSIGNED_ADDRESS=true` and Node patch permission. Assign a reserved address and verify the legacy `kubip_assigned` label has dashed IPv4, only after configured Node-address readiness checks. Test release, restart and a denied Node patch. Unrelated labels and annotations must remain unchanged. See [v1 migration](v1-migration.md) for #154.
 
 ## Metrics (#147)
 
@@ -24,7 +24,7 @@ Set `RECONCILE_INTERVAL=30s`, `RELEASE_ON_EXIT=false`, and Node patch permission
 
 After initial assignment, remove the managed access configuration, then test replacing it with an ephemeral address. The next check must restore the original reservation. The assignment label is cleared before repair and restored after the configured Node-status check. Readiness becomes false during repair or observation failure. Move the desired reservation to another disposable instance and verify the agent refuses to take it; it must not remove the current address when the desired reservation is already unavailable. Inject a delete-operation wait error and verify no add follows an uncertain delete.
 
-A cloud address change can interrupt running connections. The existing readiness taint is not re-added by the loop and a NoSchedule taint would not protect running pods. Use disposable workloads for these tests. The existing Kubernetes Lease serializes repairs with assignment, but cloud operations can still fail or be delayed, so exercise concurrent agents and failure recovery in the lab.
+A cloud address change can interrupt running connections. The existing readiness taint is not re-added by the loop and a NoSchedule taint would not protect running pods. Use disposable workloads for these tests. The existing Kubernetes Lease serializes repairs with assignment, but cloud operations can still fail or be delayed, so exercise concurrent agents and failure recovery in a disposable environment.
 
 ## Completion taint (#156)
 
@@ -42,4 +42,4 @@ Set `terminationGracePeriodSeconds` to at least 330 when release-on-exit is enab
 
 ## Acceptance and rollback
 
-Keep all six issues open until their relevant lab scenarios pass. Record candidate image digest, configuration, Node UID, addresses, cloud operation IDs and observed results. Rollback means stopping the candidate, inspecting its persisted state and owned reservations, restoring a known configuration and verifying Node readiness before admitting workloads. Retained reservations are intentional in persistent modes and require explicit cleanup after disposable nodes are removed.
+Record candidate image digest, configuration, Node UID, addresses, cloud operation IDs and observed results. Rollback means stopping the candidate, inspecting its persisted state and owned reservations, restoring a known configuration and verifying Node readiness before admitting workloads. Retained reservations are intentional in persistent modes and require explicit cleanup after disposable nodes are removed.

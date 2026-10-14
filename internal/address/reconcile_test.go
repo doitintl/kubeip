@@ -39,7 +39,7 @@ func TestGCPRestoreAddress(t *testing.T) {
 					write(&compute.Instance{Name: "instance", NetworkInterfaces: []*compute.NetworkInterface{nic}})
 				case strings.HasSuffix(r.URL.Path, "/addresses"):
 					require.Contains(t, r.URL.Query().Get("filter"), `(address="203.0.113.10")`)
-					require.Contains(t, r.URL.Query().Get("filter"), "(labels.pool=lab)")
+					require.Contains(t, r.URL.Query().Get("filter"), "(labels.pool=test)")
 					if scenario == "occupied" {
 						write(&compute.AddressList{})
 						return
@@ -80,8 +80,8 @@ func TestGCPRestoreAddress(t *testing.T) {
 			defer server.Close()
 			svc, err := compute.NewService(context.Background(), option.WithEndpoint(server.URL), option.WithoutAuthentication())
 			require.NoError(t, err)
-			a := &gcpAssigner{lister: cloud.NewLister(svc), instanceGetter: cloud.NewInstanceGetter(svc), addressManager: cloud.NewAddressManager(svc, false), waiter: cloud.NewZoneWaiter(svc), project: "lab", region: "region", logger: logrus.NewEntry(logrus.New())}
-			err = a.RestoreAddress(context.Background(), "instance", "zone", "203.0.113.10", []string{"labels.pool=lab"})
+			a := &gcpAssigner{lister: cloud.NewLister(svc), instanceGetter: cloud.NewInstanceGetter(svc), addressManager: cloud.NewAddressManager(svc, false), waiter: cloud.NewZoneWaiter(svc), project: "test", region: "region", logger: logrus.NewEntry(logrus.New())}
+			err = a.RestoreAddress(context.Background(), "instance", "zone", "203.0.113.10", []string{"labels.pool=test"})
 			switch scenario {
 			case "steady":
 				require.NoError(t, err)

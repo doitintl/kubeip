@@ -507,7 +507,7 @@ See the [chart documentation](chart/README.md) for configuration and version pin
 
 Set `AWS_IPAM_POOL_ID` to allocate an Elastic IP from an existing AWS public IPv4 IPAM pool. The default is empty, preserving preallocated-address behavior. Clear `FILTER` and `ORDER_BY`, enable Node patch permission, and use a compatible candidate image. This option is not available in 2.3.0 and must remain empty for GCP.
 
-Allocations are tagged and recovered across restarts. Failed association retains the reservation for retry; unresolved allocation outcomes stop further allocation until recovery. Normal shutdown with `RELEASE_ON_EXIT=true` releases the owned allocation back to the pool. See the [AWS IPAM lab plan](docs/lab/aws-ipam.md) for permissions, recovery, costs from retained reservations and the separate AWS validation matrix.
+Allocations are tagged and recovered across restarts. Failed association retains the reservation for retry; unresolved allocation outcomes stop further allocation until recovery. Normal shutdown with `RELEASE_ON_EXIT=true` releases the owned allocation back to the pool. See the [AWS IPAM guide](docs/aws-ipam.md) for permissions, recovery, costs from retained reservations and the separate AWS validation matrix.
 
 ### Metrics and persistent assignment modes (unreleased)
 
@@ -515,4 +515,4 @@ Allocations are tagged and recovered across restarts. Failed association retains
 
 `RECONCILE_INTERVAL=30s` enables GCP repair of a persisted reservation after address drift. `COMPLETION_TAINT_KEY` instead removes a separate taint after successful assignment or confirmed pool exhaustion, with terminal state surviving restarts. Both modes default off, require `RELEASE_ON_EXIT=false` and Node patch permission, and cannot be combined. Completion mode also cannot be combined with IPAM. Uncertain cloud failures keep the completion taint.
 
-These features are not in 2.3.0. See the [GCP lab guide](docs/lab/gcp.md) for configuration, limitations, failure tests and safe state resets. See [v1 label migration](docs/lab/v1-labels.md) if a node loses its DaemonSet selector label.
+These features are not in 2.3.0. See the [assignment lifecycle guide](docs/lifecycle.md) for configuration, limitations, failure tests and safe state resets. See [v1 label migration](docs/v1-migration.md) if a node loses its DaemonSet selector label.

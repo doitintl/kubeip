@@ -19,7 +19,7 @@ func TestGCPInventoryPaginationAndFilters(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
 		filter := r.URL.Query().Get("filter")
-		require.Contains(t, filter, "(labels.pool=lab)")
+		require.Contains(t, filter, "(labels.pool=test)")
 		require.Contains(t, filter, "(addressType=EXTERNAL)")
 		w.Header().Set("Content-Type", "application/json")
 		switch {
@@ -34,8 +34,8 @@ func TestGCPInventoryPaginationAndFilters(t *testing.T) {
 	defer server.Close()
 	svc, err := compute.NewService(context.Background(), option.WithEndpoint(server.URL), option.WithoutAuthentication())
 	require.NoError(t, err)
-	a := &gcpAssigner{lister: cloud.NewLister(svc), project: "lab", region: "us-central1"}
-	available, assigned, err := a.Inventory(context.Background(), []string{"labels.pool=lab"})
+	a := &gcpAssigner{lister: cloud.NewLister(svc), project: "test", region: "us-central1"}
+	available, assigned, err := a.Inventory(context.Background(), []string{"labels.pool=test"})
 	require.NoError(t, err)
 	require.Equal(t, 2, available)
 	require.Equal(t, 1, assigned)
