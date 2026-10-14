@@ -37,7 +37,7 @@ type managedAssigner struct {
 }
 
 func newManagedAssigner(client kubernetes.Interface, assigner address.Assigner, n *types.Node, cfg *config.Config) (*managedAssigner, error) {
-	a := &managedAssigner{Assigner: assigner, cfg: cfg, node: n, store: nd.NewAssignmentState(client, n.Name), allExhausted: true}
+	a := &managedAssigner{Assigner: assigner, cfg: cfg, node: n, store: nd.NewAssignmentState(client, n.Name, n.UID), allExhausted: true}
 	if cfg.ReconcileInterval < 0 {
 		return nil, errors.New("reconcile interval must not be negative")
 	}
@@ -77,8 +77,11 @@ func (a *managedAssigner) load(ctx context.Context) (assignmentState, string, er
 	if err := json.Unmarshal([]byte(raw), &state); err != nil {
 		return state, raw, errors.Wrap(err, "decoding assignment state")
 	}
-	if state.Instance != a.node.Instance || state.Mode != a.mode || state.Complete != (a.mode == "complete") {
+	if state.Instance != a.node.Instance || state.Mode != a.mode || (a.mode == "reconcile" && state.Complete) {
 		return state, raw, errors.New("persisted assignment state does not match this node or mode")
+	}
+	if a.mode == "complete" && !state.Complete {
+		return state, raw, errors.New("previous assignment outcome is unresolved; inspect cloud operations and drain before resetting state")
 	}
 	if state.Address == "" && a.mode == "complete" {
 		return state, raw, nil
@@ -89,12 +92,12 @@ func (a *managedAssigner) load(ctx context.Context) (assignmentState, string, er
 	return state, raw, nil
 }
 
-func (a *managedAssigner) save(ctx context.Context, ip string) error {
+func (a *managedAssigner) save(ctx context.Context, oldValue, ip string) error {
 	encoded, err := json.Marshal(assignmentState{Instance: a.node.Instance, Mode: a.mode, Address: ip, Complete: a.mode == "complete"})
 	if err != nil {
 		return errors.Wrap(err, "encoding assignment state")
 	}
-	return errors.Wrap(a.store.CompareAndSwap(ctx, "", string(encoded)), "persisting assignment result")
+	return errors.Wrap(a.store.CompareAndSwap(ctx, oldValue, string(encoded)), "persisting assignment result")
 }
 
 func (a *managedAssigner) Assign(ctx context.Context, instance, zone string, filter []string, orderBy string) (string, error) {
@@ -108,11 +111,20 @@ func (a *managedAssigner) Assign(ctx context.Context, instance, zone string, fil
 	if raw != "" {
 		return a.resume(ctx, state)
 	}
+	intent, err := a.beginAttempt(ctx)
+	if err != nil {
+		return "", err
+	}
 	ip, err := a.Assigner.Assign(ctx, instance, zone, filter, orderBy)
 	a.attempted = true
 	if err != nil && !errors.Is(err, address.ErrStaticIPAlreadyAssigned) {
 		if !errors.Is(err, address.ErrNoAvailableAddresses) {
 			a.allExhausted = false
+		} else if intent != "" {
+			if clearErr := a.store.CompareAndSwap(ctx, intent, ""); clearErr != nil {
+				a.allExhausted = false
+				return "", errors.Wrap(clearErr, "clearing confirmed exhausted attempt")
+			}
 		}
 		return "", err //nolint:wrapcheck
 	}
@@ -120,7 +132,7 @@ func (a *managedAssigner) Assign(ctx context.Context, instance, zone string, fil
 		a.allExhausted = false
 		return "", errors.Wrap(err, "invalid assigned address")
 	}
-	if err := a.save(ctx, ip); err != nil {
+	if err := a.save(ctx, intent, ip); err != nil {
 		a.allExhausted = false
 		return "", err
 	}
@@ -162,7 +174,7 @@ func (a *managedAssigner) finishExhausted(ctx context.Context, assignmentErr err
 	if !a.attempted || !a.allExhausted || !errors.Is(assignmentErr, address.ErrNoAvailableAddresses) {
 		return false, nil
 	}
-	if err := a.save(ctx, ""); err != nil {
+	if err := a.save(ctx, "", ""); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -212,7 +224,7 @@ func reconcileNode(ctx context.Context, log *logrus.Entry, client kubernetes.Int
 	if err != nil || current != state.Address {
 		m.Ready(false)
 		if a.cfg.LabelAssignedAddress {
-			if patchErr := nd.SetAssignedAddress(ctx, client, a.node.Name, ""); patchErr != nil {
+			if patchErr := nd.SetAssignedAddress(ctx, client, a.node.Name, "", a.node.UID); patchErr != nil {
 				return errors.Wrap(patchErr, "clearing drifted address label")
 			}
 		}
@@ -231,7 +243,7 @@ func reconcileNode(ctx context.Context, log *logrus.Entry, client kubernetes.Int
 		return err
 	}
 	if a.cfg.LabelAssignedAddress {
-		if err := nd.SetAssignedAddress(ctx, client, a.node.Name, state.Address); err != nil {
+		if err := nd.SetAssignedAddress(ctx, client, a.node.Name, state.Address, a.node.UID); err != nil {
 			return errors.Wrap(err, "restoring assignment label")
 		}
 	}
@@ -250,7 +262,7 @@ func publishAssignment(ctx context.Context, log *logrus.Entry, clientset kuberne
 		if assignedAddress == "" {
 			return errors.New("cannot label node with an empty assigned address")
 		}
-		if err := nd.SetAssignedAddress(ctx, clientset, n.Name, assignedAddress); err != nil {
+		if err := nd.SetAssignedAddress(ctx, clientset, n.Name, assignedAddress, n.UID); err != nil {
 			return errors.Wrap(err, "setting assignment label")
 		}
 	}
@@ -278,4 +290,19 @@ func publishAssignment(ctx context.Context, log *logrus.Entry, clientset kuberne
 	}
 
 	return nil
+}
+
+func (a *managedAssigner) beginAttempt(ctx context.Context) (string, error) {
+	if a.mode != "complete" {
+		return "", nil
+	}
+	encoded, err := json.Marshal(assignmentState{Instance: a.node.Instance, Mode: a.mode})
+	if err != nil {
+		return "", errors.Wrap(err, "encoding assignment attempt")
+	}
+	intent := string(encoded)
+	if err := a.store.CompareAndSwap(ctx, "", intent); err != nil {
+		return "", errors.Wrap(err, "recording assignment attempt")
+	}
+	return intent, nil
 }

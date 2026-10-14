@@ -184,6 +184,7 @@ func (d *explorer) GetNode(ctx context.Context, nodeName string) (*types.Node, e
 	}
 
 	return &types.Node{
+		UID:         string(n.UID),
 		Name:        nodeName,
 		Instance:    instance,
 		Cloud:       cloudProvider,

@@ -230,7 +230,7 @@ resource "kubernetes_cluster_role" "kubeip_cluster_role" {
   rule {
     api_groups = ["coordination.k8s.io"]
     resources  = ["leases"]
-    verbs      = ["create", "delete", "get"]
+    verbs      = ["create", "delete", "get", "update"]
   }
   depends_on = [
     kubernetes_service_account.kubeip_service_account,

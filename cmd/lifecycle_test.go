@@ -48,7 +48,7 @@ func (c *lifecycleCloud) RestoreAddress(_ context.Context, _, _, ip string, _ []
 
 func lifecycleFixture() (*fake.Clientset, *types.Node, *config.Config, *lifecycleCloud) {
 	client := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node", UID: "node-uid", Labels: map[string]string{"kubeip.com/public": "true"}, Annotations: map[string]string{"keep": "value"}}, Spec: corev1.NodeSpec{Taints: []corev1.Taint{{Key: "ready", Effect: corev1.TaintEffectNoSchedule}, {Key: "complete", Effect: corev1.TaintEffectNoSchedule}, {Key: "unrelated", Effect: corev1.TaintEffectNoSchedule}}}})
-	return client, &types.Node{Name: "node", Instance: "instance", Zone: "zone", Cloud: types.CloudProviderGCP}, &config.Config{CompletionTaintKey: "complete", TaintKey: "ready", LabelAssignedAddress: true, RetryInterval: time.Millisecond, LeaseDuration: 5}, &lifecycleCloud{}
+	return client, &types.Node{UID: "node-uid", Name: "node", Instance: "instance", Zone: "zone", Cloud: types.CloudProviderGCP}, &config.Config{CompletionTaintKey: "complete", TaintKey: "ready", LabelAssignedAddress: true, RetryInterval: time.Millisecond, LeaseDuration: 5}, &lifecycleCloud{}
 }
 
 func TestCompletionSurvivesRestart(t *testing.T) {
@@ -131,7 +131,7 @@ func TestCompletionKeepsTaintForAmbiguousFailure(t *testing.T) {
 	require.Error(t, runNode(context.Background(), prepareLogger("error", false), client, cloud, n, cfg))
 	node, err := client.CoreV1().Nodes().Get(context.Background(), n.Name, metav1.GetOptions{})
 	require.NoError(t, err)
-	require.Empty(t, node.Annotations[nd.AssignmentStateAnnotation])
+	require.NotEmpty(t, node.Annotations[nd.AssignmentStateAnnotation])
 	require.Len(t, node.Spec.Taints, 3)
 	require.Zero(t, cloud.releases)
 }
@@ -165,7 +165,7 @@ func TestReconcileRestoresPersistedTargetAndLabel(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "203-0-113-10", node.Labels[nd.AssignedAddressLabel])
 	// A previous failed label publication must recover even when the cloud address already matches.
-	require.NoError(t, nd.SetAssignedAddress(context.Background(), client, n.Name, ""))
+	require.NoError(t, nd.SetAssignedAddress(context.Background(), client, n.Name, "", n.UID))
 	require.NoError(t, reconcileNode(context.Background(), prepareLogger("error", false), client, a, m))
 	require.Equal(t, 1, cloud.repairs)
 	node, err = client.CoreV1().Nodes().Get(context.Background(), n.Name, metav1.GetOptions{})
@@ -211,14 +211,17 @@ func TestCompletionDoesNotTreatUncertainAttemptAsExhaustion(t *testing.T) {
 	_, err = a.Assign(context.Background(), n.Instance, n.Zone, nil, "")
 	require.Error(t, err)
 	cloud.assignErr = address.ErrNoAvailableAddresses
-	_, err = a.Assign(context.Background(), n.Instance, n.Zone, nil, "")
-	require.ErrorIs(t, err, address.ErrNoAvailableAddresses)
-	complete, err := a.finishExhausted(context.Background(), err)
+	restarted, err := newManagedAssigner(client, cloud, n, cfg)
+	require.NoError(t, err)
+	_, err = restarted.Assign(context.Background(), n.Instance, n.Zone, nil, "")
+	require.ErrorContains(t, err, "unresolved")
+	complete, err := restarted.finishExhausted(context.Background(), address.ErrNoAvailableAddresses)
 	require.NoError(t, err)
 	require.False(t, complete)
+	require.Equal(t, 1, cloud.assignments)
 	state, err := a.store.Load(context.Background())
 	require.NoError(t, err)
-	require.Empty(t, state)
+	require.Contains(t, state, `"complete":false`)
 }
 
 func TestCompletionDoesNotTreatLeaseFailureAsExhaustion(t *testing.T) {

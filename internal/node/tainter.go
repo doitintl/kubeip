@@ -49,6 +49,10 @@ func (t *tainter) RemoveTaintKey(ctx context.Context, node *types.Node, taintKey
 		return false, errors.Wrap(err, "failed to get kubernetes node")
 	}
 
+	if string(n.UID) != node.UID {
+		return false, errors.New("node was replaced; refusing to remove taints")
+	}
+
 	// Remove taint from the node representation
 	newTaints, didDelete := deleteTaintsByKey(n.Spec.Taints, taintKey)
 	if !didDelete {

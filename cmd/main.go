@@ -91,7 +91,7 @@ func assignAddress(c context.Context, log *logrus.Entry, client kubernetes.Inter
 	defer cancel()
 
 	if cfg.LabelAssignedAddress {
-		if err := nd.SetAssignedAddress(ctx, client, node.Name, ""); err != nil {
+		if err := nd.SetAssignedAddress(ctx, client, node.Name, "", node.UID); err != nil {
 			return "", errors.Wrap(err, "clearing stale assignment label")
 		}
 	}
@@ -247,7 +247,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	log.WithField("node", n).Debug("node discovery done")
 
 	// assign static public IP address with retry (interval and attempts)
-	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg, nd.NewIPAMState(clientset, n.Name))
+	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg, nd.NewIPAMState(clientset, n.Name, n.UID))
 	if err != nil {
 		return errors.Wrap(err, "initializing assigner")
 	}
@@ -313,7 +313,7 @@ func releaseIP(assigner address.Assigner, n *types.Node, client kubernetes.Inter
 	defer releaseCancel()
 
 	if labelAssignedAddress {
-		if err := nd.SetAssignedAddress(releaseCtx, client, n.Name, ""); err != nil {
+		if err := nd.SetAssignedAddress(releaseCtx, client, n.Name, "", n.UID); err != nil {
 			return errors.Wrap(err, "clearing assignment label before release")
 		}
 	}

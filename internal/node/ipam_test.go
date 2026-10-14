@@ -19,7 +19,7 @@ func TestIPAMState(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	client := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node", UID: "uid-1", ResourceVersion: "7", Annotations: map[string]string{"keep": "value"}, Labels: map[string]string{"kubeip.com/public": "true"}}})
-	state := NewIPAMState(client, "node")
+	state := NewIPAMState(client, "node", "uid-1")
 	client.PrependReactor("patch", "nodes", func(action ktesting.Action) (bool, runtime.Object, error) {
 		var patch struct {
 			Metadata struct {
@@ -51,5 +51,17 @@ func TestIPAMStatePatchConflict(t *testing.T) {
 	client.PrependReactor("patch", "nodes", func(ktesting.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "nodes"}, "node", nil)
 	})
-	require.Error(t, NewIPAMState(client, "node").CompareAndSwap(context.Background(), "", "pool/instance"))
+	require.Error(t, NewIPAMState(client, "node", "").CompareAndSwap(context.Background(), "", "pool/instance"))
+}
+
+func TestAssignmentStateRefusesReplacementNode(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node", UID: "replacement"}})
+	state := NewAssignmentState(client, "node", "original")
+	_, err := state.Load(context.Background())
+	require.ErrorContains(t, err, "replaced")
+	require.ErrorContains(t, state.CompareAndSwap(context.Background(), "", "old-instance"), "replaced")
+	for _, action := range client.Actions() {
+		require.NotEqual(t, "patch", action.GetVerb())
+	}
 }

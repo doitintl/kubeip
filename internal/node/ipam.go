@@ -17,16 +17,20 @@ type AnnotationState struct {
 	client   kubernetes.Interface
 	nodeName string
 	key      string
+	uid      string
 }
 
-func NewIPAMState(client kubernetes.Interface, nodeName string) *AnnotationState {
-	return &AnnotationState{client: client, nodeName: nodeName, key: IPAMAllocationAnnotation}
+func NewIPAMState(client kubernetes.Interface, nodeName, uid string) *AnnotationState {
+	return &AnnotationState{client: client, nodeName: nodeName, key: IPAMAllocationAnnotation, uid: uid}
 }
 
 func (s *AnnotationState) Load(ctx context.Context) (string, error) {
 	n, err := s.client.CoreV1().Nodes().Get(ctx, s.nodeName, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrap(err, "reading assignment state")
+	}
+	if string(n.UID) != s.uid {
+		return "", errors.New("node was replaced; refusing to read assignment state")
 	}
 	return n.Annotations[s.key], nil
 }
@@ -36,6 +40,9 @@ func (s *AnnotationState) CompareAndSwap(ctx context.Context, oldValue, newValue
 	n, err := s.client.CoreV1().Nodes().Get(ctx, s.nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "reading assignment state")
+	}
+	if string(n.UID) != s.uid {
+		return errors.New("node was replaced; refusing to change assignment state")
 	}
 	if n.Annotations[s.key] != oldValue {
 		return errors.New("assignment state changed")
@@ -58,6 +65,6 @@ func (s *AnnotationState) CompareAndSwap(ctx context.Context, oldValue, newValue
 // AssignmentStateAnnotation persists drift targets and terminal completion results.
 const AssignmentStateAnnotation = "kubeip.com/assignment-state"
 
-func NewAssignmentState(client kubernetes.Interface, nodeName string) *AnnotationState {
-	return &AnnotationState{client: client, nodeName: nodeName, key: AssignmentStateAnnotation}
+func NewAssignmentState(client kubernetes.Interface, nodeName, uid string) *AnnotationState {
+	return &AnnotationState{client: client, nodeName: nodeName, key: AssignmentStateAnnotation, uid: uid}
 }

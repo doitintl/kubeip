@@ -68,7 +68,7 @@ rules:
     verbs: [ "get" ]
   - apiGroups: [ "coordination.k8s.io" ]
     resources: [ "leases" ]
-    verbs: [ "create", "get", "delete" ]
+    verbs: [ "create", "get", "delete", "update" ]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -180,10 +180,10 @@ if workloads depend on the Node's advertised external address. In Helm, set
 
 The parameter has no default value, and if not set, KubeIP will not attempt to remove any taints. If the provided Taint Key is not present
 on the node, KubeIP will simply log this fact and continue normally without attempting to remove it. If the Taint Key is present, but
-removing it fails for some reason, KubeIP will release the IP address back into the pool before restarting and trying again.
+removing it fails, the default mode releases the IP address before restarting. Persistent assignment modes retain the address and saved state instead.
 
 Using this feature requires KubeIP to have permission to patch nodes. To use this feature, the `ClusterRole` resource rules need to be
-updated. **Note that if neither taint removal nor assignment labeling is enabled, KubeIP will not attempt to patch nodes, and the change to the rules is not
+updated. **Note that if taint removal, assignment labeling, IPAM and persistent assignment modes are all disabled, KubeIP will not attempt to patch nodes, and the change to the rules is not
 necessary.**
 
 Please keep in mind that this will give KubeIP permission to make updates to any node in your cluster, so please make sure that this aligns
