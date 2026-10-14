@@ -3,6 +3,7 @@ package address
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 	"time"
@@ -125,7 +126,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 	ctx, cancel := context.WithTimeout(c, timeout)
 	defer cancel()
 
-	var err error
+	transportRetries := 0
 	name := op.Name
 	for {
 		if op.Error != nil {
@@ -135,14 +136,26 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 			return nil
 		}
 		// Pass the cancellable context to the Wait method
-		op, err = a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
+		next, err := a.waiter.Wait(a.project, zone, name).Context(ctx).Do()
 		if err != nil {
-			// If the context was cancelled, return a timeout error
-			if errors.Is(err, context.Canceled) {
-				return errors.New("operation timed out")
+			if ctx.Err() != nil {
+				return errors.Wrap(ctx.Err(), "waiting for operation")
+			}
+			var networkError net.Error
+			if errors.As(err, &networkError) && transportRetries < 3 {
+				transportRetries++
+				// Recheck the same operation after changing the node's egress IP.
+				select {
+				case <-time.After(time.Second):
+					continue
+				case <-ctx.Done():
+					return errors.Wrap(ctx.Err(), "waiting for operation")
+				}
 			}
 			return errors.Wrapf(err, "failed to get operation %s", name)
 		}
+		op = next
+		transportRetries = 0
 	}
 }
 

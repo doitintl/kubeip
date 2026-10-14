@@ -3,7 +3,9 @@ package address
 import (
 	"context"
 	"fmt"
+	"net"
 	"reflect"
+	"syscall"
 	"testing"
 	"time"
 
@@ -948,5 +950,29 @@ func Test_checkStaticIPAssignedUsesManagedInterface(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestWaitForOperationRecoversConnectionReset(t *testing.T) {
+	for _, recover := range []bool{true, false} {
+		t.Run(fmt.Sprint(recover), func(t *testing.T) {
+			waiter := mocks.NewZoneWaiter(t)
+			call := mocks.NewWaitCall(t)
+			waiter.EXPECT().Wait("project", "zone", "op").Return(call)
+			call.EXPECT().Context(tmock.Anything).Return(call)
+			failures := 4
+			if recover {
+				failures = 1
+			}
+			call.EXPECT().Do().Return(nil, &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}).Times(failures)
+			if recover {
+				call.EXPECT().Do().Return(&compute.Operation{Name: "op", Status: "DONE"}, nil).Once()
+			}
+			a := &gcpAssigner{project: "project", waiter: waiter}
+			err := a.waitForOperation(context.Background(), &compute.Operation{Name: "op", Status: "RUNNING"}, "zone", 10*time.Second)
+			if (err == nil) != recover {
+				t.Fatalf("error = %v, recovery = %v", err, recover)
+			}
+		})
 	}
 }
