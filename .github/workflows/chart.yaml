@@ -7,7 +7,6 @@ on:
       - '.github/workflows/chart.yaml'
   push:
     branches: [master]
-    tags: ['chart-v*']
     paths:
       - 'chart/**'
       - '.github/workflows/chart.yaml'
@@ -37,29 +36,3 @@ jobs:
           name: helm-chart
           path: dist/*.tgz
 
-  publish:
-    needs: validate
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/chart-v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: azure/setup-helm@v4
-        with:
-          version: v4.3.0
-      - name: Verify release version
-        run: |
-          version=$(helm show chart chart | awk '$1 == "version:" {print $2}')
-          test "$GITHUB_REF_NAME" = "chart-v$version"
-      - uses: actions/download-artifact@v8
-        with:
-          name: helm-chart
-          path: dist
-      - name: Publish to GHCR
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          printf '%s' "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          helm push dist/*.tgz "oci://ghcr.io/${GITHUB_REPOSITORY,,}/charts"

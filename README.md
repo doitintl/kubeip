@@ -459,5 +459,14 @@ Invalid ordering expressions fail without changing the instance address.
 
 ### Helm chart releases
 
-See the [chart documentation](chart/README.md) for installation, version pinning,
-and the chart publication workflow.
+The Helm chart is maintained in [doitintl/kubeip-helm-chart](https://github.com/doitintl/kubeip-helm-chart)
+and published through GitHub Releases and GitHub Pages.
+
+```sh
+helm repo add kubeip https://doitintl.github.io/kubeip-helm-chart/
+helm repo update
+helm upgrade --install kubeip kubeip/kubeip \
+  --version 0.2.0 --namespace kube-system --values my-values.yaml
+```
+
+See the [chart documentation](chart/README.md) for configuration and version pinning.
