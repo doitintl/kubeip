@@ -43,7 +43,6 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
 					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall)
-					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
 							{Name: "test-address-1", Status: "RESERVED", Address: "10.10.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
@@ -55,7 +54,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 			},
 			args: args{
 				filter:  []string{"test-filter-1", "test-filter-2"},
-				orderBy: "test-order-by",
+				orderBy: "name",
 				status:  "RESERVED",
 			},
 			want: []*compute.Address{
@@ -73,7 +72,6 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 					mockCall := mocks.NewListCall(t)
 					mock.EXPECT().List("test-project", "test-region").Return(mockCall)
 					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall)
-					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall)
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
 							{Name: "test-address-1", Status: "RESERVED", Address: "10.10.0.1", NetworkTier: "PREMIUM", AddressType: "EXTERNAL"},
@@ -93,7 +91,7 @@ func Test_gcpAssigner_listAddresses(t *testing.T) {
 			},
 			args: args{
 				filter:  []string{"test-filter-1", "test-filter-2"},
-				orderBy: "test-order-by",
+				orderBy: "name",
 				status:  "RESERVED",
 			},
 			want: []*compute.Address{
@@ -362,7 +360,6 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 						},
 					}, nil).Once()
 					mockCall.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (test-filter-1) (test-filter-2)").Return(mockCall).Once()
-					mockCall.EXPECT().OrderBy("test-order-by").Return(mockCall).Once()
 					mockCall.EXPECT().Do().Return(&compute.AddressList{
 						Items: []*compute.Address{
 							{Name: "test-address-3", Status: reservedStatus, Address: "100.0.0.3", NetworkTier: defaultNetworkTier, AddressType: "EXTERNAL"},
@@ -407,7 +404,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 				instanceID: "test-instance-0",
 				zone:       "test-zone",
 				filter:     []string{"test-filter-1", "test-filter-2"},
-				orderBy:    "test-order-by",
+				orderBy:    "name",
 			},
 		},
 		{
@@ -456,7 +453,7 @@ func Test_gcpAssigner_Assign(t *testing.T) {
 				instanceID: "test-instance-0",
 				zone:       "test-zone",
 				filter:     []string{"test-filter-1", "test-filter-2"},
-				orderBy:    "test-order-by",
+				orderBy:    "name",
 			},
 		},
 	}
@@ -828,6 +825,45 @@ func Test_tryAssignAddress(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := tryAssignAddress(context.TODO(), tt.args.asFn(t), tt.args.instance, tt.args.region, tt.args.zone, tt.args.address); (err != nil) != tt.wantErr {
 				t.Errorf("tryAssignAddress() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_listAddressesSortsAcrossPages(t *testing.T) {
+	for _, tt := range []struct {
+		order   string
+		want    []string
+		wantErr bool
+	}{
+		{"name", []string{"a", "z"}, false},
+		{"name desc", []string{"z", "a"}, false},
+		{"creationTimestamp", []string{"z", "a"}, false},
+		{"creationTimestamp asc", []string{"z", "a"}, false},
+		{"creationTimestamp desc", []string{"a", "z"}, false},
+		{"unknown", nil, true},
+		{"name sideways", nil, true},
+		{"name desc extra", nil, true},
+	} {
+		t.Run(tt.order, func(t *testing.T) {
+			lister := mocks.NewLister(t)
+			call := mocks.NewListCall(t)
+			lister.EXPECT().List("project", "region").Return(call)
+			call.EXPECT().Filter("(status=RESERVED) (addressType=EXTERNAL) (ipVersion!=IPV6) (labels.env=test)").Return(call)
+			call.EXPECT().Do().Return(&compute.AddressList{Items: []*compute.Address{{Name: "z", CreationTimestamp: "2026-10-14T10:00:00+02:00"}}, NextPageToken: "next"}, nil).Once()
+			call.EXPECT().PageToken("next").Return(call).Once()
+			call.EXPECT().Do().Return(&compute.AddressList{Items: []*compute.Address{{Name: "a", CreationTimestamp: "2026-10-14T09:00:00Z"}}}, nil).Once()
+			assigner := &gcpAssigner{lister: lister, project: "project", region: "region"}
+			got, err := assigner.listAddresses([]string{"labels.env=test"}, tt.order, reservedStatus)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("error = %v", err)
+			}
+			if tt.wantErr {
+				return
+			}
+			names := []string{got[0].Name, got[1].Name}
+			if !reflect.DeepEqual(names, tt.want) {
+				t.Fatalf("names = %v, want %v", names, tt.want)
 			}
 		})
 	}

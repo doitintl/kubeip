@@ -3,6 +3,7 @@ package address
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -309,10 +310,6 @@ func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]
 	}
 	// set the filter
 	call = call.Filter(strings.Join(filters, " "))
-	// sort addresses by
-	if orderBy != "" {
-		call = call.OrderBy(orderBy)
-	}
 	// get all addresses
 	var addresses []*compute.Address
 	for {
@@ -322,6 +319,9 @@ func (a *gcpAssigner) listAddresses(filter []string, orderBy, status string) ([]
 		}
 		addresses = append(addresses, list.Items...)
 		if list.NextPageToken == "" {
+			if err := sortGCPAddresses(addresses, orderBy); err != nil {
+				return nil, err
+			}
 			return addresses, nil
 		}
 		call = call.PageToken(list.NextPageToken)
@@ -466,4 +466,39 @@ func addressPrefixLengthOrDefault(address *compute.Address) int64 {
 		return defaultPrefixLength
 	}
 	return address.PrefixLength
+}
+
+// sortGCPAddresses sorts after pagination because the API cannot combine all filters with ordering.
+func sortGCPAddresses(addresses []*compute.Address, orderBy string) error {
+	if orderBy == "" {
+		return nil
+	}
+	fields := strings.Fields(orderBy)
+	if len(fields) == 0 || len(fields) > 2 || (fields[0] != "name" && fields[0] != "creationTimestamp") {
+		return errors.Errorf("unsupported address order %q: use name or creationTimestamp with optional asc or desc", orderBy)
+	}
+	descending := len(fields) == 2 && fields[1] == "desc"
+	if len(fields) == 2 && fields[1] != "asc" && !descending {
+		return errors.Errorf("unsupported address sort direction %q", fields[1])
+	}
+	timestamps := make(map[*compute.Address]time.Time, len(addresses))
+	if fields[0] == "creationTimestamp" {
+		for _, address := range addresses {
+			timestamp, err := time.Parse(time.RFC3339Nano, address.CreationTimestamp)
+			if err != nil {
+				return errors.Wrapf(err, "invalid creation timestamp for address %s", address.Name)
+			}
+			timestamps[address] = timestamp
+		}
+	}
+	sort.SliceStable(addresses, func(i, j int) bool {
+		if descending {
+			i, j = j, i
+		}
+		if fields[0] == "creationTimestamp" {
+			return timestamps[addresses[i]].Before(timestamps[addresses[j]])
+		}
+		return addresses[i].Name < addresses[j].Name
+	})
+	return nil
 }
