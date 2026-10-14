@@ -20,7 +20,7 @@ Each agent reports its view of the same configured pool. Deduplicate with `max` 
 
 ## Drift repair (#150)
 
-Set `RECONCILE_INTERVAL=30s`, `RELEASE_ON_EXIT=false`, and Node patch permission. Keep `COMPLETION_TAINT_KEY=""`. Drift repair currently supports GCP. The first assigned reservation is persisted in `kubeip.com/assignment-state`; retries and restarts restore that address instead of selecting another one. A different instance or mode, invalid state causes an error. When repair is needed, the desired reservation must still match the filter.
+Set `RECONCILE_INTERVAL=30s`, `RELEASE_ON_EXIT=false`, and Node patch permission. Keep `COMPLETION_TAINT_KEY=""`. Drift repair currently supports GCP. The first assigned reservation is persisted in `kubeip.com/assignment-state`; retries and restarts restore that address instead of selecting another one. Invalid saved state or an instance or mode mismatch causes an error. When repair is needed, the desired reservation must still match the filter.
 
 After initial assignment, remove the managed access configuration, then test replacing it with an ephemeral address. The next check must restore the original reservation. The assignment label is cleared before repair and restored after the configured Node-status check. Readiness becomes false during repair or observation failure. Move the desired reservation to another disposable instance and verify the agent refuses to take it; it must not remove the current address when the desired reservation is already unavailable. Inject a delete-operation wait error and verify no add follows an uncertain delete.
 
