@@ -502,3 +502,9 @@ helm upgrade --install kubeip kubeip/kubeip \
 ```
 
 See the [chart documentation](chart/README.md) for configuration and version pinning.
+
+### AWS VPC IPAM (unreleased)
+
+Set `AWS_IPAM_POOL_ID` to allocate an Elastic IP from an existing AWS public IPv4 IPAM pool. The default is empty, preserving preallocated-address behavior. Clear `FILTER` and `ORDER_BY`, enable Node patch permission, and use a compatible candidate image. This option is not available in 2.3.0 and must remain empty for GCP.
+
+Allocations are tagged and recovered across restarts. Failed association retains the reservation for retry; unresolved allocation outcomes stop further allocation until recovery. Normal shutdown with `RELEASE_ON_EXIT=true` releases the owned allocation back to the pool. See the [AWS IPAM lab plan](docs/lab/aws-ipam.md) for permissions, recovery, costs from retained reservations and the separate AWS validation matrix.

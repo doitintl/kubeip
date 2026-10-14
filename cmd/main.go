@@ -237,7 +237,7 @@ func run(c context.Context, log *logrus.Entry, cfg *config.Config) error {
 	log.WithField("node", n).Debug("node discovery done")
 
 	// assign static public IP address with retry (interval and attempts)
-	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg)
+	assigner, err := address.NewAssigner(ctx, log, n.Cloud, cfg, nd.NewIPAMState(clientset, n.Name))
 	if err != nil {
 		return errors.Wrap(err, "initializing assigner")
 	}
@@ -419,6 +419,12 @@ func main() {
 						EnvVars:  []string{"RELEASE_ON_EXIT"},
 						Category: "Configuration",
 						Value:    true,
+					},
+					&cli.StringFlag{
+						Name:     "aws-ipam-pool-id",
+						Usage:    "allocate an Elastic IP from an AWS public IPv4 IPAM pool",
+						EnvVars:  []string{"AWS_IPAM_POOL_ID"},
+						Category: "Configuration",
 					},
 					&cli.BoolFlag{
 						Name:     "label-assigned-address",

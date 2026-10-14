@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	// AWSIPAMPoolID enables allocation from an AWS public IPv4 IPAM pool.
+	AWSIPAMPoolID string `json:"aws-ipam-pool-id"`
 	// LabelAssignedAddress publishes the assigned address in the legacy Node label.
 	LabelAssignedAddress bool `json:"label-assigned-address"`
 	// WaitForNodeAddress waits for Node status before labeling or removing the assignment taint.
@@ -43,6 +45,7 @@ type Config struct {
 
 func NewConfig(c *cli.Context) *Config {
 	var cfg Config
+	cfg.AWSIPAMPoolID = c.String("aws-ipam-pool-id")
 	cfg.LabelAssignedAddress = c.Bool("label-assigned-address")
 	cfg.WaitForNodeAddress = c.Bool("wait-for-node-address")
 	cfg.KubeConfigPath = c.String("kubeconfig")

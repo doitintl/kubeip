@@ -18,6 +18,9 @@ const (
 )
 
 type awsAssigner struct {
+	ipamPoolID     string
+	ipamClient     ipamAPI
+	ipamState      IPAMState
 	region         string
 	logger         *logrus.Entry
 	instanceGetter cloud.Ec2InstanceGetter
@@ -25,7 +28,7 @@ type awsAssigner struct {
 	eipAssigner    cloud.EipAssigner
 }
 
-func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (Assigner, error) {
+func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region, ipamPoolID string, state IPAMState) (Assigner, error) {
 	// initialize AWS client
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
@@ -46,6 +49,9 @@ func NewAwsAssigner(ctx context.Context, logger *logrus.Entry, region string) (A
 
 	return &awsAssigner{
 		region:         region,
+		ipamPoolID:     ipamPoolID,
+		ipamClient:     client,
+		ipamState:      state,
 		logger:         logger,
 		instanceGetter: instanceGetter,
 		eipLister:      eipLister,
@@ -166,6 +172,9 @@ func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationI
 }
 
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) (string, error) {
+	if a.ipamPoolID != "" {
+		return a.assignIPAM(ctx, instanceID)
+	}
 	// get elastic IP attached to the instance
 	assigned, err := a.getAssignedElasticIP(ctx, instanceID)
 	if err == nil {
@@ -310,6 +319,9 @@ func (a *awsAssigner) getAvailableElasticIPs(ctx context.Context, filter []strin
 }
 
 func (a *awsAssigner) Unassign(ctx context.Context, instanceID, _ string) error {
+	if a.ipamPoolID != "" {
+		return a.releaseIPAM(ctx, instanceID)
+	}
 	// get elastic IP attached to the instance
 	address, err := a.getAssignedElasticIP(ctx, instanceID)
 	if err != nil {
