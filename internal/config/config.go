@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -59,7 +60,11 @@ func NewConfig(c *cli.Context) *Config {
 	cfg.DevelopMode = c.Bool("develop-mode")
 	cfg.RetryInterval = c.Duration("retry-interval")
 	cfg.RetryAttempts = c.Int("retry-attempts")
-	cfg.Filter = c.StringSlice("filter")
+	for _, filter := range c.StringSlice("filter") {
+		if strings.TrimSpace(filter) != "" {
+			cfg.Filter = append(cfg.Filter, filter)
+		}
+	}
 	cfg.OrderBy = c.String("order-by")
 	cfg.Project = c.String("project")
 	cfg.Region = c.String("region")
