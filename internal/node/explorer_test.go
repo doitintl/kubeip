@@ -253,7 +253,12 @@ func Test_getNodePool(t *testing.T) {
 					},
 				},
 			},
-			wantErr: errors.New("failed to get node pool"),
+			want: "",
+		},
+		{
+			name: "Karpenter node pool is optional",
+			args: args{providerID: types.CloudProviderAWS, node: &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"karpenter.sh/nodepool": "public"}}}},
+			want: "",
 		},
 		{
 			name: "no node pool oci",
@@ -546,7 +551,7 @@ func Test_explorer_GetNode(t *testing.T) {
 			wantErr: errors.New("failed to get node zone"),
 		},
 		{
-			name: "failed to get node pool",
+			name: "AWS node without managed node group",
 			fields: fields{
 				client: fake.NewSimpleClientset(&v1.Node{
 					ObjectMeta: metav1.ObjectMeta{
@@ -571,7 +576,12 @@ func Test_explorer_GetNode(t *testing.T) {
 			args: args{
 				nodeName: "test-node",
 			},
-			wantErr: errors.New("failed to get node pool: failed to get node pool"),
+			want: &types.Node{
+				Name: "test-node", Instance: "i-06d71a5ffc05cc325", Cloud: types.CloudProviderAWS,
+				Region: "us-west-2", Zone: "us-west-2b",
+				ExternalIPs: []net.IP{net.ParseIP("132.10.10.1")},
+				InternalIPs: []net.IP{net.ParseIP("10.10.0.1")},
+			},
 		},
 		{
 			name: "failed to get node addresses",

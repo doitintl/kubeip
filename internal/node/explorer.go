@@ -89,7 +89,8 @@ func getNodePool(providerID types.CloudProvider, node *v1.Node) (string, error) 
 	var ok bool
 	var pool string
 	if providerID == types.CloudProviderAWS {
-		pool, ok = labels[awsPoolLabel]
+		// Pool metadata is optional for self-managed and Karpenter nodes.
+		return labels[awsPoolLabel], nil
 	} else if providerID == types.CloudProviderAzure {
 		pool, ok = labels[azurePoolLabel]
 	} else if providerID == types.CloudProviderGCP {
