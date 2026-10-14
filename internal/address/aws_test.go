@@ -543,8 +543,9 @@ func Test_awsAssigner_Assign(t *testing.T) {
 		{
 			name: "instance already has EIP assigned",
 			fields: fields{
-				region: "us-east-1",
-				logger: logrus.NewEntry(logrus.New()),
+				region:  "us-east-1",
+				address: "100.0.0.1",
+				logger:  logrus.NewEntry(logrus.New()),
 				instanceGetterFn: func(t *testing.T, args *args) cloud.Ec2InstanceGetter {
 					return nil
 				},
@@ -574,7 +575,7 @@ func Test_awsAssigner_Assign(t *testing.T) {
 				ctx:        context.Background(),
 				instanceID: "i-0abcd1234efgh5678",
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

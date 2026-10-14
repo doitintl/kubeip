@@ -167,8 +167,11 @@ func (a *awsAssigner) forceCheckAddressAssigned(ctx context.Context, allocationI
 
 func (a *awsAssigner) Assign(ctx context.Context, instanceID, _ string, filter []string, orderBy string) (string, error) {
 	// get elastic IP attached to the instance
-	err := a.checkElasticIPAssigned(ctx, instanceID)
-	if err != nil {
+	assigned, err := a.getAssignedElasticIP(ctx, instanceID)
+	if err == nil {
+		return *assigned.PublicIp, nil
+	}
+	if !errors.Is(err, ErrNoStaticIPAssigned) {
 		return "", errors.Wrapf(err, "check if elastic IP is already assigned to instance %s", instanceID)
 	}
 
@@ -252,19 +255,6 @@ func (a *awsAssigner) getNetworkInterfaceID(instance *types.Instance) (string, e
 		return "", errors.Errorf("no network interfaces with public IP address found for instance %s", *instance.InstanceId)
 	}
 	return networkInterfaceID, nil
-}
-
-func (a *awsAssigner) checkElasticIPAssigned(ctx context.Context, instanceID string) error {
-	filters := make(map[string][]string)
-	filters["instance-id"] = []string{instanceID}
-	addresses, err := a.eipLister.List(ctx, filters, true)
-	if err != nil {
-		return errors.Wrapf(err, "failed to list elastic IPs attached to instance %s", instanceID)
-	}
-	if len(addresses) > 0 {
-		return ErrStaticIPAlreadyAssigned
-	}
-	return nil
 }
 
 func (a *awsAssigner) getAssignedElasticIP(ctx context.Context, instanceID string) (*types.Address, error) {
