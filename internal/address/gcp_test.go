@@ -968,7 +968,7 @@ func TestWaitForOperationRecoversConnectionReset(t *testing.T) {
 			if recover {
 				call.EXPECT().Do().Return(&compute.Operation{Name: "op", Status: "DONE"}, nil).Once()
 			}
-			a := &gcpAssigner{project: "project", waiter: waiter}
+			a := &gcpAssigner{project: "project", waiter: waiter, logger: logrus.NewEntry(logrus.New())}
 			err := a.waitForOperation(context.Background(), &compute.Operation{Name: "op", Status: "RUNNING"}, "zone", 10*time.Second)
 			if (err == nil) != recover {
 				t.Fatalf("error = %v, recovery = %v", err, recover)

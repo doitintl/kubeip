@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -79,8 +80,9 @@ func (e *operationError) Error() string {
 }
 
 func NewGCPAssigner(ctx context.Context, logger *logrus.Entry, project, region string, ipv6 bool) (Assigner, error) {
-	// initialize Google Cloud client
-	client, err := compute.NewService(ctx)
+	// initialize Google Cloud client; the transport detects dead connections quickly,
+	// which matters right after the instance's own egress address has been removed
+	client, err := cloud.NewComputeService(ctx, cloud.NewComputeTransport(), option.WithScopes(compute.CloudPlatformScope, compute.ComputeScope))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize Google Cloud client")
 	}
@@ -145,6 +147,7 @@ func (a *gcpAssigner) waitForOperation(c context.Context, op *compute.Operation,
 			if errors.As(err, &networkError) && transportRetries < 3 {
 				transportRetries++
 				// Recheck the same operation after changing the node's egress IP.
+				a.logger.WithError(err).WithField("operation", name).Debug("transport error while waiting for operation, retrying on a new connection")
 				select {
 				case <-time.After(time.Second):
 					continue
