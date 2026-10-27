@@ -86,6 +86,7 @@ func (a *gcpAssigner) RestoreAddress(ctx context.Context, instance, zone, expect
 	if err != nil {
 		return errors.Wrap(err, "reading instance before repair")
 	}
+	accessConfigName := getAccessConfigName(vm, a.ipv6)
 	if err := a.DeleteInstanceAddress(ctx, vm, zone); err != nil && !errors.Is(err, ErrNoPublicIPAssigned) {
 		return err
 	}
@@ -93,5 +94,5 @@ func (a *gcpAssigner) RestoreAddress(ctx context.Context, instance, zone, expect
 	if err != nil {
 		return errors.Wrap(err, "refreshing instance before repair")
 	}
-	return tryAssignAddress(ctx, a, vm, a.region, zone, addresses[0])
+	return tryAssignAddress(ctx, a, vm, a.region, zone, addresses[0], accessConfigName)
 }

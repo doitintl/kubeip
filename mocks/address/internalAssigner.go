@@ -23,13 +23,13 @@ func (_m *InternalAssigner) EXPECT() *InternalAssigner_Expecter {
 	return &InternalAssigner_Expecter{mock: &_m.Mock}
 }
 
-// AddInstanceAddress provides a mock function with given fields: ctx, instance, zone, _a3
-func (_m *InternalAssigner) AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, _a3 *compute.Address) error {
-	ret := _m.Called(ctx, instance, zone, _a3)
+// AddInstanceAddress provides a mock function with given fields: ctx, instance, zone, _a3, accessConfigName
+func (_m *InternalAssigner) AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, _a3 *compute.Address, accessConfigName string) error {
+	ret := _m.Called(ctx, instance, zone, _a3, accessConfigName)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *compute.Instance, string, *compute.Address) error); ok {
-		r0 = rf(ctx, instance, zone, _a3)
+	if rf, ok := ret.Get(0).(func(context.Context, *compute.Instance, string, *compute.Address, string) error); ok {
+		r0 = rf(ctx, instance, zone, _a3, accessConfigName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,13 +47,14 @@ type InternalAssigner_AddInstanceAddress_Call struct {
 //   - instance *compute.Instance
 //   - zone string
 //   - _a3 *compute.Address
-func (_e *InternalAssigner_Expecter) AddInstanceAddress(ctx interface{}, instance interface{}, zone interface{}, _a3 interface{}) *InternalAssigner_AddInstanceAddress_Call {
-	return &InternalAssigner_AddInstanceAddress_Call{Call: _e.mock.On("AddInstanceAddress", ctx, instance, zone, _a3)}
+//   - accessConfigName string
+func (_e *InternalAssigner_Expecter) AddInstanceAddress(ctx interface{}, instance interface{}, zone interface{}, _a3 interface{}, accessConfigName interface{}) *InternalAssigner_AddInstanceAddress_Call {
+	return &InternalAssigner_AddInstanceAddress_Call{Call: _e.mock.On("AddInstanceAddress", ctx, instance, zone, _a3, accessConfigName)}
 }
 
-func (_c *InternalAssigner_AddInstanceAddress_Call) Run(run func(ctx context.Context, instance *compute.Instance, zone string, _a3 *compute.Address)) *InternalAssigner_AddInstanceAddress_Call {
+func (_c *InternalAssigner_AddInstanceAddress_Call) Run(run func(ctx context.Context, instance *compute.Instance, zone string, _a3 *compute.Address, accessConfigName string)) *InternalAssigner_AddInstanceAddress_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*compute.Instance), args[2].(string), args[3].(*compute.Address))
+		run(args[0].(context.Context), args[1].(*compute.Instance), args[2].(string), args[3].(*compute.Address), args[4].(string))
 	})
 	return _c
 }
@@ -63,7 +64,7 @@ func (_c *InternalAssigner_AddInstanceAddress_Call) Return(_a0 error) *InternalA
 	return _c
 }
 
-func (_c *InternalAssigner_AddInstanceAddress_Call) RunAndReturn(run func(context.Context, *compute.Instance, string, *compute.Address) error) *InternalAssigner_AddInstanceAddress_Call {
+func (_c *InternalAssigner_AddInstanceAddress_Call) RunAndReturn(run func(context.Context, *compute.Instance, string, *compute.Address, string) error) *InternalAssigner_AddInstanceAddress_Call {
 	_c.Call.Return(run)
 	return _c
 }

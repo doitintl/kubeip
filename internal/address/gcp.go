@@ -36,7 +36,7 @@ var (
 
 type internalAssigner interface {
 	CheckAddressAssigned(region, addressName string) (bool, error)
-	AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error
+	AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address, accessConfigName string) error
 	DeleteInstanceAddress(ctx context.Context, instance *compute.Instance, zone string) error
 }
 
@@ -185,14 +185,14 @@ func (a *gcpAssigner) DeleteInstanceAddress(ctx context.Context, instance *compu
 	return nil
 }
 
-func (a *gcpAssigner) AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address) error {
+func (a *gcpAssigner) AddInstanceAddress(ctx context.Context, instance *compute.Instance, zone string, address *compute.Address, accessConfigName string) error {
 	// get instance network interface
 	networkInterface, err := getNetworkInterface(instance)
 	if err != nil {
 		return errors.Wrap(err, "failed to get instance network interface")
 	}
 	// create access config for the address
-	accessConfig := createAccessConfig(address, a.ipv6)
+	accessConfig := createAccessConfig(address, a.ipv6, accessConfigName)
 	// add instance network interface access config
 	a.logger.WithField("accessConfig", accessConfig).Info("adding public IP address to instance")
 	op, err := a.addressManager.AddAccessConfig(a.project, zone, instance.Name, networkInterface.Name, networkInterface.Fingerprint, accessConfig)
@@ -239,6 +239,8 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 	}
 	a.logger.WithField("addresses", ips).Debugf("found %d available addresses", len(addresses))
 
+	accessConfigName := getAccessConfigName(instance, a.ipv6)
+
 	// delete current ephemeral public IP address
 	if err = a.DeleteInstanceAddress(ctx, instance, zone); err != nil && !errors.Is(err, ErrNoPublicIPAssigned) {
 		return "", errors.Wrap(err, "failed to delete current public IP address")
@@ -258,7 +260,7 @@ func (a *gcpAssigner) Assign(ctx context.Context, instanceID, zone string, filte
 		if ctx.Err() != nil {
 			return "", errors.Wrap(ctx.Err(), "context cancelled while assigning addresses")
 		}
-		if err = tryAssignAddress(ctx, a, instance, a.region, zone, address); err != nil {
+		if err = tryAssignAddress(ctx, a, instance, a.region, zone, address, accessConfigName); err != nil {
 			a.logger.WithError(err).WithField("address", address.Address).Error("failed to assign static public IP address")
 			continue
 		}
@@ -372,6 +374,7 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 
 	// check if the instance's self link is in the list of users
 	if _, ok := users[instance.SelfLink]; ok {
+		accessConfigName := getAccessConfigName(instance, a.ipv6)
 		// release/remove current static public IP address
 		if err = a.DeleteInstanceAddress(ctx, instance, zone); err != nil {
 			return errors.Wrap(err, "failed to delete current public IP address")
@@ -382,7 +385,7 @@ func (a *gcpAssigner) Unassign(ctx context.Context, instanceID, zone string) err
 			return errors.Wrapf(err, "failed refresh network interface fingerprint for instance %s", instanceID)
 		}
 		// assign ephemeral public IP address to the instance (pass nil address)
-		if err = retryAddEphemeralAddress(ctx, a.logger, a, instance, zone); err != nil {
+		if err = retryAddEphemeralAddress(ctx, a.logger, a, instance, zone, accessConfigName); err != nil {
 			return errors.Wrap(err, "failed to assign ephemeral public IP address")
 		}
 	}
@@ -402,6 +405,25 @@ func getAccessConfig(networkInterface *compute.NetworkInterface, ipv6 bool) (*co
 	return networkInterface.AccessConfigs[0], nil
 }
 
+// getAccessConfigName returns the name of the instance's current access config, falling back to the default name.
+// Replacement access configs reuse this name because access config names are immutable: if an instance's name no longer
+// matches its instance template, the managed instance group can't update it in place (e.g. GKE in-place node upgrades).
+func getAccessConfigName(instance *compute.Instance, ipv6 bool) string {
+	defaultName := defaultNetworkName
+	if ipv6 {
+		defaultName = defaultNetworkNameIPv6
+	}
+	networkInterface, err := getNetworkInterface(instance)
+	if err != nil {
+		return defaultName
+	}
+	accessConfig, err := getAccessConfig(networkInterface, ipv6)
+	if err != nil || accessConfig.Name == "" {
+		return defaultName
+	}
+	return accessConfig.Name
+}
+
 func getNetworkInterface(instance *compute.Instance) (*compute.NetworkInterface, error) {
 	if len(instance.NetworkInterfaces) == 0 {
 		return nil, errors.New("instance has no network interfaces")
@@ -409,7 +431,7 @@ func getNetworkInterface(instance *compute.Instance) (*compute.NetworkInterface,
 	return instance.NetworkInterfaces[0], nil
 }
 
-func tryAssignAddress(ctx context.Context, as internalAssigner, instance *compute.Instance, region, zone string, address *compute.Address) error {
+func tryAssignAddress(ctx context.Context, as internalAssigner, instance *compute.Instance, region, zone string, address *compute.Address, accessConfigName string) error {
 	// Force check if address is already assigned
 	addressAssigned, err := as.CheckAddressAssigned(region, address.Name)
 	if err != nil {
@@ -419,7 +441,7 @@ func tryAssignAddress(ctx context.Context, as internalAssigner, instance *comput
 		return errors.New("address is already assigned")
 	}
 	// Assign address to the instance
-	if err = as.AddInstanceAddress(ctx, instance, zone, address); err != nil {
+	if err = as.AddInstanceAddress(ctx, instance, zone, address, accessConfigName); err != nil {
 		return errors.Wrap(err, "failed to assign static public IP address")
 	}
 	return nil
@@ -435,13 +457,13 @@ func (a *gcpAssigner) createUserMap(assigned []*compute.Address) map[string]stri
 	return users
 }
 
-func retryAddEphemeralAddress(ctx context.Context, logger *logrus.Entry, as internalAssigner, instance *compute.Instance, zone string) error {
+func retryAddEphemeralAddress(ctx context.Context, logger *logrus.Entry, as internalAssigner, instance *compute.Instance, zone, accessConfigName string) error {
 	for i := 0; i < maxRetries; i++ {
 		// check if context is done before trying to assign an address
 		if ctx.Err() != nil {
 			return errors.Wrap(ctx.Err(), "context cancelled while assigning ephemeral addresses")
 		}
-		if err := as.AddInstanceAddress(ctx, instance, zone, nil); err != nil {
+		if err := as.AddInstanceAddress(ctx, instance, zone, nil, accessConfigName); err != nil {
 			logger.WithError(err).Error("failed to assign ephemeral public IP address, retrying")
 			continue
 		}
@@ -450,15 +472,14 @@ func retryAddEphemeralAddress(ctx context.Context, logger *logrus.Entry, as inte
 	return errors.New("reached max retries")
 }
 
-func createAccessConfig(address *compute.Address, ipv6 bool) *compute.AccessConfig {
+func createAccessConfig(address *compute.Address, ipv6 bool, name string) *compute.AccessConfig {
 	accessConfig := &compute.AccessConfig{
-		Name: defaultNetworkName,
+		Name: name,
 		Type: defaultAccessConfigType,
 		Kind: accessConfigKind,
 	}
 
 	if ipv6 {
-		accessConfig.Name = defaultNetworkNameIPv6
 		accessConfig.Type = defaultAccessConfigIPv6Type
 		accessConfig.ExternalIpv6 = addressAddressOrEmpty(address)
 		accessConfig.NetworkTier = addressNetworkTierOrDefault(address)
